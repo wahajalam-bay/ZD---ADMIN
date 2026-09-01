@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+/* Design tokens preserved from the reference Command Center visual identity:
+   light grey ground, white cards, restrained teal accent, dense corporate UI. */
+@theme {
+  --color-bg: #f7f8fa;
+  --color-panel: #ffffff;
+  --color-ink: #151b23;
+  --color-muted: #5b6472;
+  --color-line: #e7eaee;
+  --color-accent: #0d9488;
+  --color-accent-dark: #0f766e;
+  --color-accent-light: #e6f6f4;
+  --color-warn: #b45309;
+  --color-warn-bg: #fef3e2;
+  --color-bad: #dc2626;
+  --color-bad-bg: #fee2e2;
+  --color-info: #0369a1;
+  --color-info-bg: #e0f2fe;
+  --color-amber: #f59e0b;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-card: 10px;
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dense corporate table defaults */
+.z-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.z-table th {
+  text-align: left;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--color-line);
+  background: #fafbfc;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.z-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--color-line);
+  font-size: 13px;
+  vertical-align: middle;
+}
+.z-table tr:last-child td {
+  border-bottom: none;
+}
+.z-table tbody tr:hover td {
+  background: #fafbfc;
+}
+
+/* Section bar (reference .secbar) */
+.secbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 26px 0 12px;
+}
+.secbar h3 {
+  font-size: 12.5px;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.secbar .line {
+  flex: 1;
+  height: 1px;
+  background: var(--color-line);
+}
+
+::selection {
+  background: var(--color-accent-light);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}

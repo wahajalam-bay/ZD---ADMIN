@@ -1,0 +1,85 @@
+# Local development infrastructure.
+# Standard flow: run Postgres + MinIO in Docker, run Next.js on the host:
+#   docker compose up -d postgres minio createbucket
+#   pnpm db:migrate && pnpm db:seed:demo && pnpm dev
+# To run the app containerized too: docker compose --profile app up -d
+#
+# No Docker on your machine? `pnpm db:dev` boots an embedded PostgreSQL 18
+# and STORAGE_DRIVER=local stores media on disk (development only).
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zameen
+      POSTGRES_PASSWORD: zameen
+      POSTGRES_DB: zameen_admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zameen -d zameen_admin"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: zameen-minio
+      MINIO_ROOT_PASSWORD: zameen-minio-secret
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-shot: creates the private media bucket.
+  createbucket:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 zameen-minio zameen-minio-secret &&
+      mc mb --ignore-existing local/zameen-admin-media &&
+      echo 'bucket ready'
+      "
+
+  app:
+    profiles: ["app"]
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      APP_URL: http://localhost:3000
+      DATABASE_URL: postgres://zameen:zameen@postgres:5432/zameen_admin
+      BETTER_AUTH_SECRET: local-compose-secret-change-me
+      BETTER_AUTH_URL: http://localhost:3000
+      STORAGE_DRIVER: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: zameen-admin-media
+      S3_ACCESS_KEY_ID: zameen-minio
+      S3_SECRET_ACCESS_KEY: zameen-minio-secret
+      S3_FORCE_PATH_STYLE: "true"
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  miniodata:
