@@ -2,15 +2,20 @@ import type { Metadata } from "next";
 import { requirePageUser } from "@/server/auth/session";
 import { canReview } from "@/lib/roles";
 import {
-  attentionFeed,
-  complianceForWeek,
   lastPublishedAt,
-  openIssueCounts,
+  photoCountsByProperty,
   portfolioMetrics,
   PREVIEW,
   PUBLISHED_ONLY,
+  taskRecordsForWeek,
   taskTrend,
 } from "@/server/services/metrics-service";
+import {
+  complianceByCategory,
+  complianceSnapshot,
+  flaggedPoints,
+} from "@/server/services/checklist-compliance-service";
+import { buildPortfolioInsights } from "@/server/services/insights-service";
 import {
   listKnownWeeks,
   resolveSelectedWeek,
@@ -19,8 +24,6 @@ import {
 import { PageHeader } from "@/components/shell/page-header";
 import { ReportingControls, PreviewNotice } from "@/components/shell/reporting-controls";
 import { ModeSwitcher } from "@/components/theme/mode-switcher";
-import { SectionHeader } from "@/components/ui/section-header";
-import { Icon, type IconName } from "@/components/ui/icon";
 import { PortfolioBoard } from "@/features/command-center/portfolio-board";
 import { addDays, weekRangeLabel } from "@/lib/week";
 import { formatDateTime, formatNumber } from "@/lib/utils";
@@ -32,7 +35,7 @@ export const dynamic = "force-dynamic";
 export default async function PortfolioOverviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ week?: string; preview?: string; focus?: string }>;
+  searchParams: Promise<{ week?: string; preview?: string }>;
 }) {
   const params = await searchParams;
   const user = await requirePageUser();
@@ -43,32 +46,44 @@ export default async function PortfolioOverviewPage({
   const week = await resolveSelectedWeek(params.week);
   const prevWeek = addDays(week, -7);
 
-  const [weeks, state, metrics, prevMetrics, attention, issueCounts, prevIssueCounts, complianceMap, publishedAt, trend] =
-    await Promise.all([
-      listKnownWeeks(),
-      weekDataState(week),
-      portfolioMetrics(week, statuses),
-      portfolioMetrics(prevWeek, statuses),
-      attentionFeed(week, statuses),
-      openIssueCounts(week, statuses),
-      openIssueCounts(prevWeek, statuses),
-      complianceForWeek(week, statuses),
-      lastPublishedAt(),
-      taskTrend(week, statuses, 6),
-    ]);
+  const [
+    weeks,
+    state,
+    metrics,
+    prevMetrics,
+    compliance,
+    categoryCompliance,
+    flagged,
+    prevFlagged,
+    tasks,
+    photoCounts,
+    publishedAt,
+    trend,
+  ] = await Promise.all([
+    listKnownWeeks(),
+    weekDataState(week),
+    portfolioMetrics(week, statuses),
+    portfolioMetrics(prevWeek, statuses),
+    complianceSnapshot(week, statuses),
+    complianceByCategory(week, statuses),
+    flaggedPoints(week, statuses),
+    flaggedPoints(prevWeek, statuses),
+    taskRecordsForWeek(week, statuses),
+    photoCountsByProperty(week, statuses),
+    lastPublishedAt(),
+    taskTrend(week, statuses, 6),
+  ]);
 
-  // Portfolio compliance = clean vs total published checklist entries.
-  const complianceTotals = [...complianceMap.values()].reduce(
-    (acc, c) => ({ clean: acc.clean + c.clean, total: acc.total + c.total }),
-    { clean: 0, total: 0 },
+  const issueByProperty = new Map<string, number>();
+  for (const f of flagged) {
+    issueByProperty.set(f.propertyCode, (issueByProperty.get(f.propertyCode) ?? 0) + 1);
+  }
+
+  const prevByProperty = new Map(
+    prevMetrics.perProperty.map(({ property, stats }) => [property.code, stats]),
   );
-  const compliancePct =
-    complianceTotals.total > 0
-      ? Math.round((complianceTotals.clean / complianceTotals.total) * 100)
-      : null;
-  const prevOpenIssues = [...prevIssueCounts.values()].reduce((a, b) => a + b, 0);
 
-  const properties = metrics.perProperty.map(({ property, stats, compliance }) => ({
+  const properties = metrics.perProperty.map(({ property, stats, compliance: c }) => ({
     code: property.code,
     name: property.name,
     meta:
@@ -78,11 +93,48 @@ export default async function PortfolioOverviewPage({
     tracking: stats?.trackingStatus ?? null,
     completed: stats?.tasks.completed ?? 0,
     inProcess: stats?.tasks.inProcess ?? 0,
-    compliancePct: compliance.pct,
-    openIssues: issueCounts.get(property.id) ?? 0,
+    compliancePct: c.pct,
+    complianceClean: c.clean,
+    complianceFlagged: c.flagged,
+    complianceTotal: c.total,
+    openIssues: issueByProperty.get(property.code) ?? 0,
     photos: stats?.photoCount ?? 0,
     summary: stats?.summary || null,
+    prevCompleted: prevByProperty.get(property.code)?.tasks.completed ?? null,
+    prevInProcess: prevByProperty.get(property.code)?.tasks.inProcess ?? null,
   }));
+
+  // Was there any comparable reporting last week? Drives delta suppression.
+  const hasPrevWeekData = prevMetrics.perProperty.some((p) => p.stats !== null);
+
+  const insights = buildPortfolioInsights({
+    weekLabel: weekRangeLabel(week),
+    properties: metrics.perProperty.map(({ property, stats, compliance: c }) => ({
+      code: property.code,
+      name: property.name,
+      completed: stats?.tasks.completed ?? 0,
+      inProcess: stats?.tasks.inProcess ?? 0,
+      photos: stats?.photoCount ?? 0,
+      openIssues: issueByProperty.get(property.code) ?? 0,
+      compliance: c,
+      hasReport: stats !== null,
+    })),
+    previous: {
+      completed: hasPrevWeekData ? prevMetrics.tasks.completed : null,
+      inProcess: hasPrevWeekData ? prevMetrics.tasks.inProcess : null,
+      photos: hasPrevWeekData ? prevMetrics.sitePhotos : null,
+      openIssues: prevFlagged.length,
+      compliancePct: compliance.previous.pct,
+    },
+    current: {
+      completed: metrics.tasks.completed,
+      inProcess: metrics.tasks.inProcess,
+      photos: metrics.sitePhotos,
+      openIssues: flagged.length,
+      compliancePct: compliance.current.pct,
+    },
+    flagged,
+  });
 
   const areaLabel =
     metrics.area.complete && metrics.area.sum > 0
@@ -117,75 +169,46 @@ export default async function PortfolioOverviewPage({
       {previewOn ? <PreviewNotice weekStart={week} /> : null}
 
       <PortfolioBoard
+        week={week}
         weekLabel={weekRangeLabel(week)}
+        hasPrevWeekData={hasPrevWeekData}
         kpis={{
           completed: metrics.tasks.completed,
           completedPrev: prevMetrics.tasks.completed,
           inProcess: metrics.tasks.inProcess,
           inProcessPrev: prevMetrics.tasks.inProcess,
-          compliancePct,
-          complianceClean: complianceTotals.clean,
-          complianceTotal: complianceTotals.total,
-          openIssues: attention.length,
-          openIssuesPrev: prevOpenIssues,
+          compliancePct: compliance.current.pct,
+          compliancePrevPct: compliance.previous.pct,
+          complianceDeltaPp: compliance.deltaPp,
+          complianceClean: compliance.current.clean,
+          complianceFlagged: compliance.current.flagged,
+          complianceTotal: compliance.current.total,
+          openIssues: flagged.length,
+          openIssuesPrev: prevFlagged.length,
           photos: metrics.sitePhotos,
           photosPrev: prevMetrics.sitePhotos,
           completionPct: metrics.completionPct,
         }}
         trend={trend}
         properties={properties}
-        attention={attention.map((a) => ({
-          responseId: a.responseId,
-          propertyCode: a.propertyCode,
-          propertyName: a.propertyName,
-          categoryName: a.categoryName,
-          itemName: a.itemName,
-          issue: a.issue,
-          severity: a.severity,
-          entryDate: a.entryDate,
-          ageDays: a.ageDays,
-          workflowStatus: a.workflowStatus,
+        attention={flagged.map((f) => ({
+          responseId: f.responseId,
+          propertyCode: f.propertyCode,
+          propertyName: f.propertyName,
+          categoryName: f.categoryName,
+          itemName: f.itemName,
+          issue: f.issue,
+          severity: f.severity,
+          entryDate: f.entryDate,
+          ageDays: f.ageDays,
+          workflowStatus: f.workflowStatus,
           evidence: [],
         }))}
+        tasks={tasks}
+        photoCounts={photoCounts}
+        categoryCompliance={categoryCompliance}
+        insights={insights}
       />
-
-      <SectionHeader
-        title="Reporting context"
-        icon="property"
-        className="mt-8"
-        description={`Figures reflect ${previewOn ? "approved and published" : "published"} records for ${weekRangeLabel(week)} only — weeks are never mixed.`}
-      />
-      <div className="grid gap-3 sm:grid-cols-3">
-        <ContextTile icon="check" label="Completed tasks" value={`${metrics.tasks.completed} this week`} />
-        <ContextTile icon="loader" label="Still in process" value={`${metrics.tasks.inProcess} carried`} />
-        <ContextTile
-          icon="shield"
-          label="Checklist entries measured"
-          value={`${complianceTotals.total} published`}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ContextTile({
-  icon,
-  label,
-  value,
-}: {
-  icon: IconName;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center gap-2.5 rounded-tile border border-line bg-panel px-3.5 py-2.5">
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-tile bg-panel2 text-muted">
-        <Icon name={icon} className="h-3.5 w-3.5" />
-      </span>
-      <span>
-        <span className="block text-[12.5px] font-semibold text-ink">{value}</span>
-        <span className="t-label text-muted">{label}</span>
-      </span>
     </div>
   );
 }

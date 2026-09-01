@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export default async function PhotosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ week?: string; preview?: string }>;
+  searchParams: Promise<{ week?: string; preview?: string; property?: string }>;
 }) {
   const sp = await searchParams;
   const user = await requirePageUser();
@@ -95,7 +95,11 @@ export default async function PhotosPage({
 
       {previewOn ? <PreviewNotice weekStart={week} /> : null}
 
-      <PhotosAlbums albums={albums} weekLabel={weekRangeLabel(week)} />
+      <PhotosAlbums
+        albums={albums}
+        weekLabel={weekRangeLabel(week)}
+        initialCode={sp.property ?? null}
+      />
     </div>
   );
 }

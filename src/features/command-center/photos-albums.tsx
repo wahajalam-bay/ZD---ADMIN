@@ -28,11 +28,16 @@ export interface PropertyAlbumData {
 export function PhotosAlbums({
   albums,
   weekLabel,
+  initialCode,
 }: {
   albums: PropertyAlbumData[];
   weekLabel: string;
+  /** Deep link from a drill-down (`?property=OPAL`) opens that album directly. */
+  initialCode?: string | null;
 }) {
-  const [openCode, setOpenCode] = React.useState<string | null>(null);
+  const [openCode, setOpenCode] = React.useState<string | null>(
+    initialCode && albums.some((a) => a.code === initialCode) ? initialCode : null,
+  );
   const [type, setType] = React.useState<"progress" | "evidence">("progress");
   const [evidenceLightbox, setEvidenceLightbox] = React.useState<number | null>(null);
 
@@ -126,7 +131,7 @@ export function PhotosAlbums({
                
               <img src={a.coverUrl} alt="" className="h-[132px] w-full object-cover" />
             ) : (
-              <div className="h-[92px] w-full bg-[var(--grad-hero)] opacity-90" aria-hidden />
+              <div className="h-[92px] w-full bg-[image:var(--grad-hero)] opacity-90" aria-hidden />
             )}
             <div className="p-4">
               <h3 className="text-[15px] font-bold text-ink group-hover:text-accent-dark">

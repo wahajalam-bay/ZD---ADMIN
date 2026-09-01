@@ -131,16 +131,28 @@ export function TrackingBadge({
   );
 }
 
-/** Small dot + accessible label for sidebar property status. */
-export function TrackingDot({ status }: { status: Tracking | null }) {
+/**
+ * Small dot + accessible label for property status. `onDark` brightens the cue
+ * for the dark navigation surface; the accessible label always carries the
+ * meaning so colour is never the only signal (§8).
+ */
+export function TrackingDot({ status, onDark }: { status: Tracking | null; onDark?: boolean }) {
   const color =
     status === "ON_TRACK"
-      ? "bg-accent"
+      ? onDark
+        ? "bg-[#5cc08a]"
+        : "bg-accent"
       : status === "WATCH"
-        ? "bg-warn"
+        ? onDark
+          ? "bg-[#f0a850]"
+          : "bg-warn"
         : status === "AT_RISK"
-          ? "bg-bad"
-          : "bg-line-strong";
+          ? onDark
+            ? "bg-[#f87171]"
+            : "bg-bad"
+          : onDark
+            ? "bg-white/30"
+            : "bg-line-strong";
   return (
     <span
       className={cn("h-2 w-2 shrink-0 rounded-full", color)}

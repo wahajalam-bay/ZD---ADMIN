@@ -198,7 +198,7 @@ export function ReviewQueue({
                 ) : null}
               </div>
               <StatusBadge status={item.status} size="sm" />
-              <span className="ms-auto inline-flex items-center gap-1 rounded-input bg-[var(--grad-green)] px-3 py-1.5 text-[11.5px] font-bold text-white">
+              <span className="ms-auto inline-flex items-center gap-1 rounded-input bg-[image:var(--grad-green)] px-3 py-1.5 text-[11.5px] font-bold text-white">
                 Review <ArrowRight className="h-3 w-3" aria-hidden />
               </span>
             </Link>

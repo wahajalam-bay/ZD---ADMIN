@@ -5,7 +5,6 @@ import { getPropertyByCode } from "@/server/permissions";
 import { canReview } from "@/lib/roles";
 import {
   attentionFeed,
-  complianceForWeek,
   lastPublishedAt,
   bottlenecksForProperty,
   propertyWeekStats,
@@ -14,6 +13,12 @@ import {
   taskTrend,
   tasksForProperty,
 } from "@/server/services/metrics-service";
+import {
+  complianceByCategory,
+  complianceSnapshot,
+  flaggedPoints,
+} from "@/server/services/checklist-compliance-service";
+import { buildPropertyInsights } from "@/server/services/insights-service";
 import {
   listKnownWeeks,
   resolveSelectedWeek,
@@ -26,21 +31,20 @@ import {
 import { weeklyPhotosForWeek } from "@/server/services/media-service";
 import { buildPropOneDomains } from "@/features/command-center/propone-mapper";
 import { PropOneSection } from "@/features/command-center/propone-section";
-import { AttentionFeed } from "@/features/command-center/attention-feed";
 import { BottleneckTable } from "@/features/command-center/bottleneck-table";
 import { AlbumGallery } from "@/features/command-center/album-gallery";
+import { PropertyBoard } from "@/features/command-center/property-board";
 import { PageHeader } from "@/components/shell/page-header";
 import { ReportingControls, PreviewNotice } from "@/components/shell/reporting-controls";
 import { ModeSwitcher } from "@/components/theme/mode-switcher";
 import { SectionHeader } from "@/components/ui/section-header";
-import { Card, ChartCard } from "@/components/ui/card";
-import { KpiCard, KpiStrip } from "@/components/ui/kpi-card";
-import { ProgressRing } from "@/components/ui/progress-ring";
+import { Card } from "@/components/ui/card";
 import { TrackingBadge, TaskStatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { taskCompletionPct } from "@/lib/metrics";
 import { formatDateTime, formatEta } from "@/lib/utils";
-import { addDays, weekRangeLabel } from "@/lib/week";
+import { addDays, weekEndOf, weekRangeLabel } from "@/lib/week";
+import { localDateStr } from "@/lib/propone-metrics";
 import { mediaUrl } from "@/lib/media-url";
 
 export const dynamic = "force-dynamic";
@@ -80,13 +84,17 @@ export default async function PropertyDashboardPage({
     state,
     statsMap,
     prevStatsMap,
-    complianceMap,
+    compliance,
+    categoryCompliance,
+    flagged,
+    prevFlagged,
     tasks,
     bottlenecks,
     attention,
     widgets,
     trends,
     photos,
+    prevPhotos,
     publishedAt,
     trend,
   ] = await Promise.all([
@@ -94,22 +102,29 @@ export default async function PropertyDashboardPage({
     weekDataState(week, property.id),
     propertyWeekStats(week, statuses, [property.id]),
     propertyWeekStats(prevWeek, statuses, [property.id]),
-    complianceForWeek(week, statuses, [property.id]),
+    complianceSnapshot(week, statuses, [property.id]),
+    complianceByCategory(week, statuses, [property.id]),
+    flaggedPoints(week, statuses, [property.id]),
+    flaggedPoints(prevWeek, statuses, [property.id]),
     tasksForProperty(property.id, week, statuses),
     bottlenecksForProperty(property.id, week, statuses),
     attentionFeed(week, statuses, { propertyIds: [property.id] }),
     propOneWidgetsForProperty(property.id, week),
     propOneTrendsForProperty(property.id),
     weeklyPhotosForWeek(week, statuses, property.id),
+    weeklyPhotosForWeek(prevWeek, statuses, property.id),
     lastPublishedAt(property.id),
     taskTrend(week, statuses, 6, property.id),
   ]);
 
   const stats = statsMap.get(property.id) ?? null;
   const prevStats = prevStatsMap.get(property.id) ?? null;
-  const compliance = complianceMap.get(property.id) ?? { total: 0, clean: 0, flagged: 0, pct: null };
   const completionPct = stats ? taskCompletionPct(stats.tasks) : null;
-  const domains = buildPropOneDomains(widgets, trends);
+  const domains = buildPropOneDomains(widgets, trends, {
+    today: localDateStr(new Date()),
+    weekStart: week,
+    weekEnd: weekEndOf(week),
+  });
 
   const evidenceById = new Map(bottlenecks.map((b) => [b.responseId, b.evidence]));
   const attentionRows = attention.map((a) => ({
@@ -134,6 +149,19 @@ export default async function PropertyDashboardPage({
   const meta = [property.location, property.propertyType, property.areaLabel, property.developmentStatus]
     .filter(Boolean)
     .join(" · ");
+
+  const hasPrevWeekData = prevStats !== null || compliance.previous.total > 0;
+
+  const insights = buildPropertyInsights({
+    propertyName: property.name,
+    compliance: compliance.current,
+    previousCompliancePct: compliance.previous.pct,
+    flagged,
+    completed: stats?.tasks.completed ?? 0,
+    inProcess: stats?.tasks.inProcess ?? 0,
+    previousCompleted: prevStats?.tasks.completed ?? null,
+    photos: photos.length,
+  });
 
   return (
     <div data-testid={`property-dashboard-${property.code}`}>
@@ -180,107 +208,44 @@ export default async function PropertyDashboardPage({
         </div>
       </Card>
 
-      {/* 3 — Core operational KPIs */}
-      <KpiStrip className="mb-7">
-        <KpiCard
-          label="Completed"
-          value={stats?.tasks.completed ?? 0}
-          icon="check"
-          tone="green"
-          delta={{ value: (stats?.tasks.completed ?? 0) - (prevStats?.tasks.completed ?? 0), label: "vs last week" }}
-          sparkline={trend.map((t) => t.completed)}
-        />
-        <KpiCard
-          label="In Process"
-          value={stats?.tasks.inProcess ?? 0}
-          icon="loader"
-          tone="orange"
-          delta={{
-            value: (stats?.tasks.inProcess ?? 0) - (prevStats?.tasks.inProcess ?? 0),
-            label: "vs last week",
-            invert: true,
-          }}
-          sparkline={trend.map((t) => t.inProcess)}
-        />
-        <KpiCard
-          label="Checklist Compliance"
-          value={compliance.pct === null ? "—" : `${compliance.pct}%`}
-          icon="shield"
-          tone={compliance.pct !== null && compliance.pct < 70 ? "orange" : "green"}
-          progress={compliance.pct}
-          hint={`${compliance.clean} clean of ${compliance.total} entries`}
-        />
-        <KpiCard
-          label="Open Issues"
-          value={attentionRows.length}
-          icon="alert"
-          tone={attentionRows.length > 0 ? "red" : "green"}
-        />
-        <KpiCard label="Photos Logged" value={photos.length} icon="camera" tone="blue" />
-      </KpiStrip>
-
-      {/* 4 — Attention required */}
-      <SectionHeader
-        title="Attention required"
-        icon="warning"
-        description="Unresolved checklist issues for this reporting week — most serious first."
+      {/* 3–5 — Executive KPIs, insights, exceptions and weekly performance */}
+      <PropertyBoard
+        propertyCode={property.code}
+        propertyName={property.name}
+        week={week}
+        weekLabel={weekRangeLabel(week)}
+        hasPrevWeekData={hasPrevWeekData}
+        previewOn={previewOn}
+        kpis={{
+          completed: stats?.tasks.completed ?? 0,
+          completedPrev: prevStats?.tasks.completed ?? null,
+          inProcess: stats?.tasks.inProcess ?? 0,
+          inProcessPrev: prevStats?.tasks.inProcess ?? null,
+          compliancePct: compliance.current.pct,
+          compliancePrevPct: compliance.previous.pct,
+          complianceDeltaPp: compliance.deltaPp,
+          complianceClean: compliance.current.clean,
+          complianceFlagged: compliance.current.flagged,
+          complianceTotal: compliance.current.total,
+          openIssues: flagged.length,
+          openIssuesPrev: prevFlagged.length,
+          photos: photos.length,
+          photosPrev: prevStats ? prevPhotos.length : null,
+          completionPct,
+        }}
+        trend={trend}
+        tasks={tasks.map((t) => ({
+          id: t.id,
+          propertyCode: property.code,
+          propertyName: property.name,
+          task: t.task,
+          status: t.status,
+          etaDate: t.etaDate,
+        }))}
+        attention={attentionRows}
+        categoryCompliance={categoryCompliance}
+        insights={insights}
       />
-      <AttentionFeed
-        rows={attentionRows}
-        showProperty={false}
-        limit={5}
-        emptyTitle={`No open checklist issues for ${property.name} this week`}
-        emptyDetail="Flagged checklist points and their evidence appear here as soon as they are published."
-      />
-
-      {/* 5 — Task completion + checklist compliance */}
-      <SectionHeader className="mt-8" title="Weekly performance" icon="clipboard" />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Task completion" question="How much of this week's work is finished?">
-          {stats ? (
-            <div className="flex flex-wrap items-center gap-5">
-              <ProgressRing
-                value={completionPct}
-                caption="Done"
-                ariaLabel={`Task completion ${completionPct ?? 0} percent`}
-              />
-              <ul className="flex min-w-[130px] flex-col gap-2 text-[12.5px]">
-                <Legend color="var(--c1)" label="Completed" value={stats.tasks.completed} />
-                <Legend color="var(--c3)" label="In Process" value={stats.tasks.inProcess} />
-                <Legend color="var(--c2)" label="Photos" value={photos.length} />
-              </ul>
-            </div>
-          ) : (
-            <EmptyState
-              compact
-              title={`No ${previewOn ? "approved" : "published"} weekly report for this week`}
-              detail="Task metrics appear once the site's weekly report is approved and published."
-            />
-          )}
-        </ChartCard>
-        <ChartCard title="Checklist compliance" question="How clean were this week's checklists?">
-          {compliance.total > 0 ? (
-            <div className="flex flex-wrap items-center gap-5">
-              <ProgressRing
-                value={compliance.pct}
-                caption="Clean"
-                ariaLabel={`Checklist compliance ${compliance.pct ?? 0} percent`}
-              />
-              <ul className="flex min-w-[130px] flex-col gap-2 text-[12.5px]">
-                <Legend color="var(--c1)" label="Clean" value={compliance.clean} />
-                <Legend color="var(--red)" label="Flagged" value={compliance.flagged} />
-                <Legend color="var(--neutral-track)" label="Total entries" value={compliance.total} />
-              </ul>
-            </div>
-          ) : (
-            <EmptyState
-              compact
-              title="No published checklist entries this week"
-              detail="Compliance is computed from published daily checklist entries."
-            />
-          )}
-        </ChartCard>
-      </div>
 
       {/* 6 — PropOne */}
       <SectionHeader
@@ -369,15 +334,5 @@ export default async function PropertyDashboardPage({
         emptyText={`No ${previewOn ? "approved or published" : "published"} progress photos for ${property.name} this week.`}
       />
     </div>
-  );
-}
-
-function Legend({ color, label, value }: { color: string; label: string; value: number }) {
-  return (
-    <li className="flex items-center gap-2">
-      <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: color }} aria-hidden />
-      <span className="flex-1 text-ink">{label}</span>
-      <b className="font-mono">{value}</b>
-    </li>
   );
 }

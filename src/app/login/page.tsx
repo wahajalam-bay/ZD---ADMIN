@@ -14,8 +14,12 @@ export default async function LoginPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center px-4">
-      {/* Bayut hero backdrop */}
-      <div className="bg-grad-hero absolute inset-x-0 top-0 h-[46vh]" aria-hidden />
+      {/* Bayut hero backdrop — the brand block above the card sits on it */}
+      <div
+        className="absolute inset-x-0 top-0 h-[52vh] min-h-[320px]"
+        style={{ background: "var(--grad-hero)" }}
+        aria-hidden
+      />
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
           <span

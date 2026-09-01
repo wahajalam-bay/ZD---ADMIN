@@ -2,24 +2,49 @@
 
 Ambiguities are resolved explicitly here — never hidden inside implementation.
 
-## 1. Checklist compliance formula (preserved, with one mapping decision)
+## 1. Checklist compliance formula (point-based — REVISED)
 
-The reference Command Center **does** define a formula (`renderSiteCharts`):
+The reference Command Center defines only the **shape** of the metric
+(`renderSiteCharts`), with clean/flagged/total supplied as static sample values:
 
 ```js
-pct = Math.round((checklist_clean / checklist_total) * 100) // legend: Clean / Flagged / Total pages
+pct = Math.round((checklist_clean / checklist_total) * 100) // legend: Clean / Flagged / Total
 ```
 
-It is preserved verbatim in `src/lib/compliance.ts` (unit-tested). One mapping was
-required: the reference counted static *deck pages*; the live system counts
-**published checklist entries** (one property + category + day) as the compliance unit.
+The Data Entry Engine contains **no** compliance or scoring logic at all, so the
+derivation rule had to be decided. It is preserved verbatim in `src/lib/compliance.ts`
+(unit-tested), with these decisions:
 
-An entry is **flagged** when any item response has a defect comment/severity **or** is
-not marked complete for both OP and CL — the reference bottlenecks explicitly treat
-blank/unchecked sheets as issues ("Friday column left entirely blank", "Date field
-left blank"). LOG categories have no item rows and cannot flag.
+**Unit = one checklist POINT.** A point is a single `checklist_responses` row: one
+checklist item, on one entry (property + category + day). Earlier this project counted
+whole *entries*; that made one comment on a 40-item sheet as costly as forty, so the
+unit is now the point. Portfolio compliance aggregates every point — it is never an
+average of per-property averages (`groupCompliance` + `computeCompliance`,
+unit-tested against exactly that mistake).
 
-*The formula lives in one isolated, unit-tested module so the business rule can be
+**A point is flagged only when the site team recorded an issue** — a defect comment
+and/or an explicit severity. `responseIsDefect()` is the single definition, shared by
+compliance *and* the bottleneck feed, so the two can never disagree.
+
+**OP / CL are NOT pass/fail.** They are the Opening and Closing checks (confirmed by
+reference items such as "Time (Opening & Closing)"). An unticked OP or CL is therefore
+**not** treated as non-compliance — doing so would invent a failure rule the source
+artifacts never state. (This reverses an earlier decision in this project.)
+
+**Visibility.** Only `PUBLISHED` entries count in official reporting; management
+preview additionally counts `APPROVED`. `DRAFT`, `SUBMITTED` and `RETURNED` work is
+never measured, so an unfinished sheet cannot move a management number
+(`PUBLISHED_VISIBILITY` / `PREVIEW_VISIBILITY`, unit-tested).
+
+**No data ≠ 0%.** With zero applicable points `pct` is `null` and the UI shows "—"
+plus the reason, never a fabricated zero.
+
+**Rates compare in percentage points.** Week-on-week movement uses
+`complianceDeltaPp()` and is labelled `pp`, never `%`. When either week has nothing to
+measure the delta is `null` and the KPI says "No prior-week comparison".
+
+*The formula lives in one isolated, unit-tested module, and every server aggregation
+(`checklist-compliance-service.ts`) delegates to it, so the business rule can be
 changed centrally if management prefers a different definition.*
 
 ## 2. Bottleneck severity (product improvement, recorded)
@@ -33,9 +58,9 @@ derivation logic exists in either reference. Decision:
   on healthy rows.
 - A defect without a chosen severity defaults to **Low**.
 - Bottleneck rows = responses with a described defect (comment/severity), ordered
-  most-severe → most recent. Rows that are merely incomplete (unchecked OP/CL, no
-  comment) reduce compliance but are not listed as bottlenecks, matching the
-  reference's curated issue list.
+  most-severe → most recent. This is the same `responseIsDefect()` predicate that
+  drives compliance (§1), so the bottleneck count and the flagged-point count always
+  reconcile — a unit test asserts it.
 
 ## 3. Production portfolio
 

@@ -75,6 +75,25 @@ test.describe("Modes & accessibility", () => {
     await expect(panel).toBeHidden();
   });
 
+  test("the sidebar account menu opens fully inside the viewport", async ({ page }) => {
+    await login(page, ACCOUNTS.am);
+    await page.goto("/command-center");
+
+    // The user panel sits at the bottom of a full-height fixed sidebar, so the
+    // menu must flip upward instead of falling off the bottom of the screen.
+    await page.getByRole("button", { name: "Account menu" }).click();
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+
+    const box = (await menu.boundingBox())!;
+    const viewport = page.viewportSize()!;
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    await expect(page.getByRole("menuitem", { name: /sign out/i })).toBeVisible();
+
+    await page.keyboard.press("Escape");
+  });
+
   test("portfolio KPI cross-filtering narrows the attention feed", async ({ page }) => {
     await login(page, ACCOUNTS.am);
     await page.goto("/command-center");

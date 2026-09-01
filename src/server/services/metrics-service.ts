@@ -13,12 +13,14 @@ import {
   weeklyTasks,
 } from "@/db/schema";
 import {
-  computeCompliance,
   effectiveSeverity,
   selectBottlenecks,
+  PREVIEW_VISIBILITY,
+  PUBLISHED_VISIBILITY,
   type ComplianceResult,
   type Severity,
 } from "@/lib/compliance";
+import { complianceByProperty } from "./checklist-compliance-service";
 import { aggregateTaskCounts, taskCompletionPct, totalArea, type TaskCounts } from "@/lib/metrics";
 import { addDays, weekEndOf } from "@/lib/week";
 import type { WorkflowStatus } from "@/lib/roles";
@@ -28,8 +30,8 @@ import type { WorkflowStatus } from "@/lib/roles";
  * defaults to PUBLISHED data; management preview adds APPROVED.
  */
 export type VisibleStatuses = WorkflowStatus[];
-export const PUBLISHED_ONLY: VisibleStatuses = ["PUBLISHED"];
-export const PREVIEW: VisibleStatuses = ["PUBLISHED", "APPROVED"];
+export const PUBLISHED_ONLY: VisibleStatuses = [...PUBLISHED_VISIBILITY];
+export const PREVIEW: VisibleStatuses = [...PREVIEW_VISIBILITY];
 
 export async function listActiveProperties() {
   return db
@@ -119,7 +121,7 @@ export async function portfolioMetrics(
 ): Promise<PortfolioMetrics> {
   const activeProperties = await listActiveProperties();
   const stats = await propertyWeekStats(weekStart, statuses);
-  const complianceMap = await complianceForWeek(weekStart, statuses);
+  const complianceMap = await complianceByProperty(weekStart, statuses);
 
   let completed = 0;
   let inProcess = 0;
@@ -145,60 +147,81 @@ export async function portfolioMetrics(
   };
 }
 
-/** Compliance per property for a week, computed from published entries. */
+/**
+ * Compliance per property — delegates to `checklistComplianceService`, the
+ * single server-side source of truth (never computed in components).
+ */
 export async function complianceForWeek(
   weekStart: string,
   statuses: VisibleStatuses,
   propertyIds?: string[],
 ): Promise<Map<string, ComplianceResult>> {
-  const weekEnd = weekEndOf(weekStart);
-  const entries = await db
-    .select({ id: checklistEntries.id, propertyId: checklistEntries.propertyId })
-    .from(checklistEntries)
+  return complianceByProperty(weekStart, statuses, propertyIds);
+}
+
+export interface TaskRecord {
+  id: string;
+  propertyCode: string;
+  propertyName: string;
+  task: string;
+  status: "COMPLETED" | "IN_PROCESS";
+  etaDate: string | null;
+}
+
+/** Every visible weekly task for a week — powers task drill-down panels. */
+export async function taskRecordsForWeek(
+  weekStart: string,
+  statuses: VisibleStatuses,
+  propertyIds?: string[],
+): Promise<TaskRecord[]> {
+  return db
+    .select({
+      id: weeklyTasks.id,
+      propertyCode: properties.code,
+      propertyName: properties.name,
+      task: weeklyTasks.task,
+      status: weeklyTasks.status,
+      etaDate: weeklyTasks.etaDate,
+    })
+    .from(weeklyTasks)
+    .innerJoin(weeklyReports, eq(weeklyReports.id, weeklyTasks.weeklyReportId))
+    .innerJoin(properties, eq(properties.id, weeklyReports.propertyId))
     .where(
       and(
-        inArray(checklistEntries.workflowStatus, statuses),
-        gte(checklistEntries.entryDate, weekStart),
-        lte(checklistEntries.entryDate, weekEnd),
-        ...(propertyIds ? [inArray(checklistEntries.propertyId, propertyIds)] : []),
+        eq(weeklyReports.weekStart, weekStart),
+        inArray(weeklyReports.workflowStatus, statuses),
+        ...(propertyIds && propertyIds.length > 0
+          ? [inArray(weeklyReports.propertyId, propertyIds)]
+          : []),
       ),
-    );
+    )
+    .orderBy(asc(properties.displayOrder), asc(weeklyTasks.sortOrder));
+}
 
-  const result = new Map<string, ComplianceResult>();
-  if (entries.length === 0) return result;
-
-  const responses = await db
+/** Per-property photo counts for the media drill-down. */
+export async function photoCountsByProperty(
+  weekStart: string,
+  statuses: VisibleStatuses,
+): Promise<Array<{ propertyCode: string; propertyName: string; count: number }>> {
+  const rows = await db
     .select({
-      entryId: checklistResponses.entryId,
-      op: checklistResponses.op,
-      cl: checklistResponses.cl,
-      comment: checklistResponses.comment,
-      severity: checklistResponses.severity,
+      propertyCode: properties.code,
+      propertyName: properties.name,
+      count: sql<number>`count(*)::int`,
     })
-    .from(checklistResponses)
+    .from(weeklyMedia)
+    .innerJoin(weeklyReports, eq(weeklyReports.id, weeklyMedia.weeklyReportId))
+    .innerJoin(properties, eq(properties.id, weeklyMedia.propertyId))
     .where(
-      inArray(
-        checklistResponses.entryId,
-        entries.map((e) => e.id),
+      and(
+        eq(weeklyReports.weekStart, weekStart),
+        inArray(weeklyReports.workflowStatus, statuses),
+        eq(weeklyMedia.mediaType, "IMAGE"),
       ),
-    );
-  const byEntry = new Map<string, typeof responses>();
-  for (const r of responses) {
-    const list = byEntry.get(r.entryId) ?? [];
-    list.push(r);
-    byEntry.set(r.entryId, list);
-  }
-
-  const byProperty = new Map<string, Array<{ responses: typeof responses }>>();
-  for (const e of entries) {
-    const list = byProperty.get(e.propertyId) ?? [];
-    list.push({ responses: byEntry.get(e.id) ?? [] });
-    byProperty.set(e.propertyId, list);
-  }
-  for (const [propertyId, list] of byProperty) {
-    result.set(propertyId, computeCompliance(list));
-  }
-  return result;
+    )
+    .groupBy(properties.code, properties.name, properties.displayOrder)
+    .orderBy(asc(properties.displayOrder));
+  return rows;
 }
 
 export interface BottleneckRow {

@@ -8,7 +8,7 @@ type Size = "sm" | "md" | "lg";
 const variants: Record<Variant, string> = {
   default: "border border-line bg-panel text-ink hover:border-line-strong hover:bg-panel2",
   primary:
-    "border border-transparent bg-[var(--grad-green)] text-white shadow-[0_3px_10px_-2px_rgba(13,122,63,0.45)] hover:brightness-110",
+    "border border-transparent bg-[image:var(--grad-green)] text-white shadow-[0_3px_10px_-2px_rgba(13,122,63,0.45)] hover:brightness-110",
   ghost: "border border-transparent bg-transparent text-accent-dark hover:bg-accent-light",
   subtle: "border border-transparent bg-panel2 text-ink hover:bg-accent-light",
   danger: "border border-bad/40 bg-panel text-bad hover:bg-bad-bg",

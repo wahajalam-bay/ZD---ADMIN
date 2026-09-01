@@ -20,6 +20,7 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seeds/run.ts",
     "db:seed:demo": "tsx src/db/seeds/run.ts --demo",
+    "db:seed:legacy": "tsx src/db/seeds/run.ts --legacy",
     "db:studio": "drizzle-kit studio",
     "db:dev": "tsx scripts/dev-db.ts",
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",

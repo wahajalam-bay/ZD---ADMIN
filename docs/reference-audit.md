@@ -83,10 +83,84 @@ components on live queries.
 | PropOne — Quadrangle Work Orders, Visitors (period), Vehicle Stickers (Owner/LTR), Snooker bookings, Announcements | `WORK_ORDERS`, `VISITORS`, `VEHICLE_STICKERS`, `AMENITY_BOOKINGS`, `ANNOUNCEMENTS` widgets |
 | Photos page: per-property galleries, counts, lightbox with prev/next/keyboard/fullscreen | `/command-center/photos` with property + week filters, Progress vs Evidence tabs, accessible lightbox |
 | Site Videos (none submitted) / Live Camera (not configured) | Honest empty states; media model supports VIDEO for later; no fabricated feeds |
-| Static sample figures (15 completed / 9 in process / 146 photos / all PropOne counts) | **Not seeded as production data** — demo seed creates clearly-labeled synthetic DEMO records instead |
+| Static sample figures (15 completed / 9 in process / 146 photos / all PropOne counts) | **Merged verbatim** into the legacy reporting week — see "Legacy merge" below |
+
+## 4. Legacy merge — "Week of 20 Aug 2026"
+
+A line-by-line reconciliation of the deck against the live database
+(`pnpm db:seed:legacy`, data in [`src/db/seeds/legacy-data.ts`](../src/db/seeds/legacy-data.ts))
+found that the deck's own reporting week existed **nowhere** in the tool. It has now
+been merged end-to-end and re-verified: the reconciliation reports zero discrepancies.
+
+### What was wrong
+
+| Finding | Detail |
+| --- | --- |
+| Legacy week absent | No `weekly_reports`, tasks or checklist entries existed for 17–23 Aug 2026 |
+| 24 weekly tasks missing | Only 8 shortened `DEMO —` paraphrases existed (e.g. "DEMO — B1 interior paint work completed" vs the deck's "B1 interior paint work has been completed"); Quadrangle had 2 of its 7 |
+| 12 checklist bottlenecks missing | None of the deck's issue texts or severities were present; the tool held unrelated DEMO/E2E issues instead |
+| 3 management summaries missing | The deck's PropOne status paragraphs were not stored anywhere |
+| 146 reference photos mis-dated | `import:reference-photos` parked them on whatever week was current at import time, not the week they document |
+| 4 checklists unmodelled | The deck reports on checklists the Data Entry Engine schema does not define (below) |
+| Property master data | **No discrepancy** — location, type, area label, area sqft and development status match the deck exactly for all three properties |
+| Photo counts | **No discrepancy** — 45 Opal / 42 Aurum / 59 Quadrangle, matching the deck |
+
+### What was merged
+
+- All **24 weekly tasks**, character-for-character, with the deck's statuses and
+  dd-MM-yyyy ETA/completion dates converted to ISO. Totals reproduce the deck:
+  Opal 9+3, Aurum 3+2, Quadrangle 3+4, portfolio **15 completed / 9 in process**.
+- All **12 checklist bottlenecks**, verbatim, with the deck's severities
+  (4 High, 7 Medium, 1 Low) recorded against real checklist points, published.
+- The **3 management summaries**, verbatim.
+- The **146 reference photographs** re-dated onto the week they document.
+- Tracking status derived from the deck's completion rate (Opal 75% → On track,
+  Aurum 60% → Watch, Quadrangle 43% → At risk); the deck printed no status.
+
+### Mapping decisions (the only judgement calls)
+
+The deck names checklists in prose; responses must attach to a real checklist point.
+
+| Deck checklist | Recorded against | Point |
+| --- | --- | --- |
+| Mini Cinema Weekly Checklist | `cinema` | Projector & Speakers count |
+| IT Room Checklist | `cctv_room` | All Cameras Check |
+| Fitness Center Checklist | `gym` | Sheet Completeness & Sign-off |
+| Washrooms Checklist | `cafeteria` (the engine files washroom points here) | Sheet Completeness & Sign-off |
+| Weekly Pool Maintenance Log · Swimming Pool's Asset Checklist | `swimming_pool` | Sheet Completeness & Sign-off |
+| Fire Fighting Room Checklist | `fire_fighting` | Sheet Completeness & Sign-off |
+| 100 KVA Genset Reading Log | **new** `genset_100_log` | Reading Date Current |
+| Genset Maintenance Sign-off | **new** `genset_maintenance` | Next Visit Date |
+| Genset Performance Metrics | **new** `genset_performance` | Pass / Fail Result |
+| Reception Checklist | **new** `reception` | Air Conditioning |
+
+Two additions were required and are deliberately visible rather than hidden:
+
+1. **Four deck-sourced categories.** The four checklists above exist in the deck but
+   not in the Data Entry Engine's 22-category schema. Forcing them into an unrelated
+   engine category would have destroyed their attribution, so they are added as new
+   categories. The engine's 22 categories are untouched.
+2. **One `Sheet Completeness & Sign-off` point** on `gym`, `cafeteria`,
+   `swimming_pool` and `fire_fighting`. Four deck issues are about the *sheet* (a
+   blank FM Manager sign-off, a blank date field, an entirely blank day column) and
+   no per-item point can carry them. One explicitly named point is added to those
+   four categories only; every original engine point is left as-is.
+
+`tests/unit/legacy-merge.test.ts` locks all of the above against the deck's figures.
+
+### Where the numbers legitimately differ
+
+The deck printed compliance as 50% Opal / 68% Aurum / 67% Quadrangle. The merged week
+computes **90% / 88% / 87%**. This is not a data loss: the deck counted *slide pages*,
+whereas this system counts *checklist points* ([decisions.md §1](./decisions.md)). The
+underlying flagged issues are identical — 3 / 6 / 3, exactly as the deck listed.
+
+PropOne figures are **not** overwritten by the deck's static counts: those tables are
+fed by the live Redshift sync. The deck's numbers are preserved verbatim inside each
+property's weekly summary, which is where the deck itself put them.
 
 ## Unresolved ambiguities
 
 Recorded with rationale in [decisions.md](./decisions.md): severity capture, sidebar
 status-dot/phase semantics, PropOne API specification, publication model detail,
-compliance mapping from "deck pages" to "entries".
+compliance mapping from "deck pages" to "checklist points".

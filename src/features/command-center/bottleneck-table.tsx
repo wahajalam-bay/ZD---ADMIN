@@ -39,7 +39,7 @@ export function BottleneckTable({
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="z-table" data-testid="bottleneck-table">
+        <table className="z-table z-table--exec" data-testid="bottleneck-table">
           <thead>
             <tr>
               <th style={{ width: 96 }}>Severity</th>

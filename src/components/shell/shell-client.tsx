@@ -63,7 +63,9 @@ function SidebarNav({
     <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-2.5 pb-4">
       {sections.map((section) => (
         <div key={section.label} className="mb-1">
-          <div className="t-label px-2.5 pt-4 pb-1.5 text-muted/80">{section.label}</div>
+          <div className="t-label px-2.5 pt-4 pb-1.5" style={{ color: "var(--nav-label)" }}>
+            {section.label}
+          </div>
           {section.items.map((item) => {
             const active =
               pathname === item.href ||
@@ -79,25 +81,19 @@ function SidebarNav({
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "group relative mb-0.5 flex items-center gap-2.5 rounded-input px-2.5 py-[7px] text-[12.8px] transition-colors",
-                  active
-                    ? "bg-accent-light font-bold text-accent-dark"
-                    : "text-ink/85 hover:bg-panel2",
+                  "nav-item group relative mb-0.5 flex items-center gap-2.5 rounded-input px-2.5 py-[7px] text-[12.8px] transition-colors",
+                  active && "font-bold",
                 )}
+                style={{
+                  background: active ? "var(--nav-active)" : undefined,
+                  color: active ? "var(--nav-text-strong)" : "var(--nav-text)",
+                  borderInlineStart: `3px solid ${active ? "var(--nav-active-bar)" : "transparent"}`,
+                }}
               >
-                {active ? (
-                  <span
-                    aria-hidden
-                    className="absolute inset-y-1.5 start-0 w-[3px] rounded-full bg-accent"
-                  />
-                ) : null}
                 {isProperty ? (
-                  <TrackingDot status={item.tracking ?? null} />
+                  <TrackingDot status={item.tracking ?? null} onDark />
                 ) : Icon ? (
-                  <Icon
-                    className={cn("h-4 w-4 shrink-0", active ? "text-accent-dark" : "text-muted")}
-                    aria-hidden
-                  />
+                  <Icon className="h-4 w-4 shrink-0 opacity-85" aria-hidden />
                 ) : null}
                 <span className="flex-1 truncate">{item.label}</span>
                 {item.badge ? (
@@ -116,7 +112,10 @@ function SidebarNav({
 
 function BrandPanel() {
   return (
-    <div className="mx-2.5 mb-1 flex items-center gap-2.5 rounded-[14px] bg-[var(--grad-header)] px-3 py-2.5 shadow-card-2">
+    <div
+      className="mx-2.5 mb-2 flex items-center gap-2.5 rounded-[14px] px-3 py-2.5"
+      style={{ background: "rgba(255,255,255,.07)", border: "1px solid var(--nav-border)" }}
+    >
       <span
         aria-hidden
         className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-gradient-to-br from-white to-[#d8f0e2] text-[12px] font-extrabold text-accent-deep shadow-[0_4px_12px_rgba(0,0,0,0.25),inset_0_0_0_1px_rgba(255,255,255,0.6)]"
@@ -124,11 +123,13 @@ function BrandPanel() {
         ZA
       </span>
       <div className="min-w-0 leading-tight">
-        <div className="text-[11.5px] font-extrabold tracking-[0.4px] text-white">
+        <div className="text-[11.5px] font-extrabold tracking-[0.4px] whitespace-nowrap text-white">
           ZAMEEN DEVELOPMENTS
         </div>
-        <div className="text-[9.5px] font-semibold tracking-[0.4px] text-white/70">
-          Admin Properties · Command Center
+        <div className="mt-0.5 text-[9.5px] leading-snug font-semibold tracking-[0.3px] text-white/65">
+          Admin Properties
+          <br />
+          Command Center
         </div>
       </div>
     </div>
@@ -148,21 +149,27 @@ function UserPanel({
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("");
   return (
-    <div className="mx-2.5 mb-2.5 flex items-center gap-2.5 rounded-tile border border-line bg-panel2 px-2.5 py-2">
+    <div
+      className="mx-2.5 mb-2.5 flex items-center gap-2.5 rounded-tile px-2.5 py-2"
+      style={{ background: "rgba(255,255,255,.07)", border: "1px solid var(--nav-border)" }}
+    >
       <span
         aria-hidden
-        className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-[var(--grad-green)] text-[11px] font-bold text-white"
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-[image:var(--grad-green)] text-[11px] font-bold text-white"
       >
         {initials || "U"}
       </span>
       <div className="min-w-0 flex-1 leading-tight">
-        <div className="truncate text-[12px] font-bold text-ink">{user.name}</div>
-        <div className="truncate text-[10.5px] text-muted">{user.roleLabel}</div>
+        <div className="truncate text-[12px] font-bold text-white">{user.name}</div>
+        <div className="truncate text-[10.5px]" style={{ color: "var(--nav-label)" }}>
+          {user.roleLabel}
+        </div>
       </div>
       <ActionMenu
+        onDark
         label="Account menu"
         items={[
-          { label: user.email, icon: UserCircle, onSelect: () => undefined },
+          { label: user.email, icon: UserCircle, onSelect: () => undefined, readOnly: true },
           { label: "Sign out", icon: LogOut, onSelect: onSignOut, danger: true },
         ]}
       />
@@ -194,7 +201,7 @@ export function ShellClient({
     <>
       <BrandPanel />
       {demoEnvironment ? (
-        <div className="mx-2.5 mt-1.5 flex items-center gap-1.5 rounded-input border border-warn/30 bg-warn-bg px-2.5 py-1 text-[10px] font-bold text-warn">
+        <div className="mx-2.5 mb-1 flex items-center gap-1.5 rounded-input border border-[#f0a850]/40 bg-[#f0a850]/15 px-2.5 py-1 text-[10px] font-bold text-[#f7c98b]">
           <ShieldCheck className="h-3 w-3" aria-hidden />
           DEMO DATA ENVIRONMENT
         </div>
@@ -211,12 +218,15 @@ export function ShellClient({
       </a>
 
       {/* Desktop sidebar — 236px (kit range 230–245) */}
-      <aside className="fixed inset-y-0 start-0 z-40 hidden w-[236px] flex-col border-e border-line bg-panel pt-3 lg:flex">
+      <aside
+        className="fixed inset-y-0 start-0 z-40 hidden w-[236px] flex-col pt-3 lg:flex"
+        style={{ background: "var(--nav-bg)", borderInlineEnd: "1px solid var(--nav-border)" }}
+      >
         {sidebarBody()}
       </aside>
 
       {/* Mobile bar + drawer */}
-      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between bg-[var(--grad-header)] px-4 py-2.5 shadow-card-2 lg:hidden">
+      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between bg-[image:var(--grad-header)] px-4 py-2.5 shadow-card-2 lg:hidden">
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden
@@ -249,7 +259,10 @@ export function ShellClient({
             aria-hidden
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="anim-panel absolute inset-y-0 start-0 flex w-[264px] flex-col bg-panel pt-3 shadow-panel">
+          <aside
+            className="anim-panel absolute inset-y-0 start-0 flex w-[264px] flex-col pt-3 shadow-panel"
+            style={{ background: "var(--nav-bg)" }}
+          >
             {sidebarBody(() => setMobileOpen(false))}
           </aside>
         </div>

@@ -125,7 +125,27 @@ function TooltipRenderer({
   return <>{render(String(label ?? ""), items, payload[0]?.payload)}</>;
 }
 
+/** " (+25%)" style suffix; omitted when the baseline is zero (undefined %). */
+function changeSuffix(current: number, previous: number): string {
+  if (previous === 0) return "";
+  const pct = Math.round(((current - previous) / previous) * 100);
+  if (pct === 0) return " (no change)";
+  return ` (${pct > 0 ? "+" : ""}${pct}%)`;
+}
+
 // ── Grouped bar: compare 2 series across categories (§3 comparison) ─────────
+
+export interface GroupedBarDatum {
+  name: string;
+  completed: number;
+  inProcess: number;
+  key?: string;
+  /** Previous-period values, when a comparable period exists. */
+  prevCompleted?: number | null;
+  prevInProcess?: number | null;
+}
+
+export type TaskSeries = "COMPLETED" | "IN_PROCESS";
 
 export function GroupedBar({
   data,
@@ -134,31 +154,55 @@ export function GroupedBar({
   height = 220,
   contextLabel,
 }: {
-  data: Array<{ name: string; completed: number; inProcess: number; key?: string }>;
-  onSelect?: (key: string) => void;
+  data: GroupedBarDatum[];
+  /** Cross-filter + drill: the property key AND which series was clicked. */
+  onSelect?: (key: string, series: TaskSeries) => void;
   activeKey?: string | null;
   height?: number;
   contextLabel?: string;
 }) {
   const renderTip = React.useCallback<TooltipRender>(
-    (label, items) => {
-        const total = items.reduce((a, b) => a + b.value, 0);
-        const done = items.find((i) => i.key === "Completed")?.value ?? 0;
-        return (
-          <PremiumTooltipCard
-            title={label}
-            context={contextLabel}
-            rows={[
-              ...items.map((i) => ({ label: i.key, value: String(i.value), color: i.color })),
-              {
-                label: "Completion",
-                value: total > 0 ? `${Math.round((done / total) * 100)}%` : "—",
-                muted: true,
-              },
-            ]}
-            footer={onSelect ? "Click a bar to filter this property" : undefined}
-          />
-        );
+    (label, items, raw) => {
+      const total = items.reduce((a, b) => a + b.value, 0);
+      const done = items.find((i) => i.key === "Completed")?.value ?? 0;
+      const prevCompleted = raw?.prevCompleted as number | null | undefined;
+      const prevInProcess = raw?.prevInProcess as number | null | undefined;
+      const rows: TooltipRow[] = items.map((i) => ({
+        label: i.key,
+        value: String(i.value),
+        color: i.color,
+      }));
+
+      // Previous-period context only when the data actually carries it.
+      if (typeof prevCompleted === "number") {
+        rows.push({
+          label: "Completed last week",
+          value: `${prevCompleted}${changeSuffix(done, prevCompleted)}`,
+          muted: true,
+        });
+      }
+      if (typeof prevInProcess === "number") {
+        const inProc = items.find((i) => i.key === "In Process")?.value ?? 0;
+        rows.push({
+          label: "In process last week",
+          value: `${prevInProcess}${changeSuffix(inProc, prevInProcess)}`,
+          muted: true,
+        });
+      }
+      rows.push({
+        label: "Completion",
+        value: total > 0 ? `${Math.round((done / total) * 100)}%` : "—",
+        muted: true,
+      });
+
+      return (
+        <PremiumTooltipCard
+          title={label}
+          context={contextLabel}
+          rows={rows}
+          footer={onSelect ? "Click a bar to view those tasks" : undefined}
+        />
+      );
     },
     [contextLabel, onSelect],
   );
@@ -190,7 +234,7 @@ export function GroupedBar({
             isAnimationActive={false}
             onClick={(entry) => {
               const payload = (entry as { payload?: { key?: string; name?: string } }).payload;
-              onSelect?.(payload?.key ?? payload?.name ?? "");
+              onSelect?.(payload?.key ?? payload?.name ?? "", "COMPLETED");
             }}
             cursor={onSelect ? "pointer" : undefined}
           >
@@ -215,7 +259,7 @@ export function GroupedBar({
             isAnimationActive={false}
             onClick={(entry) => {
               const payload = (entry as { payload?: { key?: string; name?: string } }).payload;
-              onSelect?.(payload?.key ?? payload?.name ?? "");
+              onSelect?.(payload?.key ?? payload?.name ?? "", "IN_PROCESS");
             }}
             cursor={onSelect ? "pointer" : undefined}
           >

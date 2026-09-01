@@ -56,11 +56,13 @@ test.describe("Site user isolation (Opal)", () => {
   });
 
   test("site user cannot fetch another property's media objects", async ({ page, browser }) => {
-    // Grab a real Aurum media URL as management first.
+    // Grab a real Aurum media URL as management first. The week is pinned to
+    // the merged legacy week so the fixture cannot go missing when the default
+    // reporting week happens to have no photographs.
     const adminContext = await browser.newContext();
     const adminPage = await adminContext.newPage();
     await login(adminPage, ACCOUNTS.am);
-    await adminPage.goto("/command-center/aurum");
+    await adminPage.goto("/command-center/aurum?week=2026-08-17");
     const src = await adminPage
       .locator('img[src^="/api/media/"]')
       .first()
