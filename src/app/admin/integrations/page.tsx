@@ -4,11 +4,12 @@ import { listAllProperties } from "@/server/services/admin-service";
 import { CSV_TEMPLATES } from "@/server/integrations/propone/validators";
 import { PROPONE_DOMAINS, PROPONE_DOMAIN_LABELS } from "@/lib/propone-metrics";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/status-badge";
 import { PropOneImport } from "@/features/admin/propone-import";
 import { RedshiftStatus } from "@/features/admin/redshift-status";
 import { WidgetConfigMatrix } from "@/features/admin/widget-config-matrix";
 import { formatDateTime } from "@/lib/utils";
+import { PageHeader } from "@/components/shell/page-header";
 
 export const metadata: Metadata = { title: "Integrations" };
 export const dynamic = "force-dynamic";
@@ -29,30 +30,33 @@ export default async function AdminIntegrationsPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <div className="mb-1 text-[11.5px] font-semibold tracking-wider text-muted uppercase">
-          Administration
-        </div>
-        <h2 className="text-[22px] font-bold">PropOne Integration</h2>
-      </div>
+      <PageHeader
+        eyebrow="Administration"
+        title="PropOne Integration"
+        meta={
+          status.lastSuccess
+            ? `Last successful sync ${formatDateTime(status.lastSuccess.startedAt)} · ${status.lastSuccess.recordsImported} records imported`
+            : "No successful sync recorded yet"
+        }
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-[13px] font-bold tracking-wide uppercase">Source mode</h3>
-            <Badge className="bg-ink text-white">
+            <h3 className="t-card">Source mode</h3>
+            <Badge tone="deep">
               {status.mode === "api" ? "API" : status.mode === "redshift" ? "Redshift" : "File import"}
             </Badge>
           </div>
           <p className="text-[13px] leading-relaxed text-muted">{status.active.detail}</p>
           <div className="mt-3 border-t border-line pt-3">
-            <div className="text-[11px] font-bold tracking-wide text-muted uppercase">API readiness</div>
+            <div className="t-label text-muted">API readiness</div>
             <p className="mt-1 text-[13px] leading-relaxed text-muted">{status.api.detail}</p>
           </div>
           <RedshiftStatus detail={status.redshift.detail} configured={status.redshiftConfigured} />
         </Card>
         <Card className="p-5">
-          <h3 className="mb-2 text-[13px] font-bold tracking-wide uppercase">Last successful sync</h3>
+          <h3 className="mb-2 t-card">Last successful sync</h3>
           {status.lastSuccess ? (
             <dl className="space-y-1.5 text-[13px]">
               <div className="flex justify-between">
@@ -83,7 +87,7 @@ export default async function AdminIntegrationsPage() {
       />
 
       <Card className="p-5">
-        <h3 className="mb-1 text-[13px] font-bold tracking-wide uppercase">Dashboard widgets per property</h3>
+        <h3 className="mb-1 t-card">Dashboard widgets per property</h3>
         <p className="mb-3 text-[12.5px] text-muted">
           Which PropOne data domains each property dashboard shows. The real
           property↔PropOne mapping is configurable here — nothing is hard-coded.
@@ -96,7 +100,7 @@ export default async function AdminIntegrationsPage() {
       </Card>
 
       <Card className="overflow-hidden">
-        <div className="border-b border-line px-5 py-3 text-[11px] font-bold tracking-wide text-muted uppercase">
+        <div className="border-b border-line px-5 py-3 t-label text-muted">
           Recent sync runs
         </div>
         {status.recentRuns.length === 0 ? (
@@ -130,15 +134,16 @@ export default async function AdminIntegrationsPage() {
                     <td className="font-mono text-xs">{run.recordsRejected}</td>
                     <td>
                       <Badge
-                        className={
+                        tone={
                           run.status === "SUCCESS"
-                            ? "bg-accent-light text-accent-dark"
+                            ? "green"
                             : run.status === "PARTIAL"
-                              ? "bg-warn-bg text-warn"
+                              ? "orange"
                               : run.status === "FAILED"
-                                ? "bg-bad-bg text-bad"
-                                : "bg-slate-100 text-muted"
+                                ? "red"
+                                : "neutral"
                         }
+                        size="sm"
                       >
                         {run.status}
                       </Badge>

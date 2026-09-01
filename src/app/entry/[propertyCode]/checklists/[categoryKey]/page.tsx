@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPropertyByCode } from "@/server/permissions";
 import { requirePageUser } from "@/server/auth/session";
@@ -7,6 +6,7 @@ import { canEditSubmission } from "@/lib/roles";
 import { isIsoDate, todayStr } from "@/lib/week";
 import { mediaUrl } from "@/lib/media-url";
 import { ChecklistEntryForm } from "@/features/entry/checklist-entry-form";
+import { PageHeader } from "@/components/shell/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -60,12 +60,15 @@ export default async function ChecklistEntryPage({
 
   return (
     <div>
-      <Link
-        href={`/entry/${property.code}/checklists?date=${date}`}
-        className="text-xs font-semibold text-accent-dark hover:underline"
-      >
-        ← All checklists
-      </Link>
+      <PageHeader
+        breadcrumb={[
+          { label: property.name, href: `/entry/${property.code}` },
+          { label: "Daily Checklists", href: `/entry/${property.code}/checklists?date=${date}` },
+          { label: view.category.name },
+        ]}
+        title={view.category.name}
+        meta={date}
+      />
       <ChecklistEntryForm
         propertyCode={property.code}
         category={{

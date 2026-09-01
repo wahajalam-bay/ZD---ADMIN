@@ -4,8 +4,10 @@ import { eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { properties, weeklyReports } from "@/db/schema";
 import { getWeeklyReportView } from "@/server/services/weekly-report-service";
-import { StatusBadge, TaskStatusBadge, TrackingBadge } from "@/components/ui/badge";
+import { StatusBadge, TaskStatusBadge, TrackingBadge } from "@/components/ui/status-badge";
 import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/shell/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ReviewActionsBar } from "@/features/review/review-actions-bar";
 import { AuditTimeline } from "@/features/review/audit-timeline";
 import { EvidenceThumbs } from "@/features/review/evidence-thumbs";
@@ -30,50 +32,56 @@ export default async function WeeklyReviewPage({ params }: { params: Promise<{ i
   if (!report) notFound();
 
   return (
-    <div className="space-y-4" data-testid="review-weekly-detail">
-      <div>
-        <Link href="/review" className="text-xs font-semibold text-accent-dark hover:underline">
-          ← Review queue
-        </Link>
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-[20px] font-bold">{row.property.name} — Weekly Report</h2>
-            <p className="mt-0.5 font-mono text-xs text-muted">
-              {weekRangeLabel(report.weekStart)} · submitted {formatDateTime(report.submittedAt)}
-            </p>
-          </div>
+    <div className="space-y-5" data-testid="review-weekly-detail">
+      <PageHeader
+        breadcrumb={[
+          { label: "Review Queue", href: "/review" },
+          { label: row.property.name },
+          { label: "Weekly Report" },
+        ]}
+        title={`${row.property.name} — Weekly Report`}
+        meta={
+          <>
+            {weekRangeLabel(report.weekStart)} · submitted {formatDateTime(report.submittedAt)} ·{" "}
+            {tasks.length} task{tasks.length === 1 ? "" : "s"} · {media.length} photo
+            {media.length === 1 ? "" : "s"}
+          </>
+        }
+        controls={
           <div className="flex items-center gap-2">
             <TrackingBadge status={report.trackingStatus} />
             <StatusBadge status={report.workflowStatus} />
             <Link
               href={`/entry/${row.property.code}/weekly?week=${report.weekStart}`}
-              className="rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-bold hover:bg-panel2"
+              className="rounded-input border border-line bg-panel px-3 py-1.5 text-[11.5px] font-bold hover:bg-panel2"
             >
               Open in entry form
             </Link>
           </div>
-        </div>
-      </div>
+        }
+      />
+
+      <ReviewActionsBar kind="weekly" id={report.id} status={report.workflowStatus} />
 
       <Card className="p-5">
-        <div className="mb-1 text-[11px] font-bold tracking-wide text-muted uppercase">
+        <div className="mb-1 t-label text-muted">
           Management summary
         </div>
         <p className="text-[14px]">{report.summary || "—"}</p>
         {report.notes ? (
           <>
-            <div className="mt-4 mb-1 text-[11px] font-bold tracking-wide text-muted uppercase">Notes</div>
+            <div className="mt-4 mb-1 t-label text-muted">Notes</div>
             <p className="text-[13px] whitespace-pre-wrap text-muted">{report.notes}</p>
           </>
         ) : null}
       </Card>
 
       <Card className="overflow-hidden">
-        <div className="border-b border-line px-5 py-3 text-[11px] font-bold tracking-wide text-muted uppercase">
+        <div className="border-b border-line px-5 py-3 t-label text-muted">
           Tasks ({tasks.length})
         </div>
         {tasks.length === 0 ? (
-          <div className="px-5 py-6 text-center text-[13px] text-muted">No tasks in this report.</div>
+          <EmptyState compact title="No tasks were recorded in this weekly report" />
         ) : (
           <table className="z-table">
             <thead>
@@ -101,7 +109,7 @@ export default async function WeeklyReviewPage({ params }: { params: Promise<{ i
       </Card>
 
       <Card className="p-5">
-        <div className="mb-3 text-[11px] font-bold tracking-wide text-muted uppercase">
+        <div className="mb-3 t-label text-muted">
           Progress photos ({media.length})
         </div>
         {media.length === 0 ? (
@@ -119,7 +127,6 @@ export default async function WeeklyReviewPage({ params }: { params: Promise<{ i
         )}
       </Card>
 
-      <ReviewActionsBar kind="weekly" id={report.id} status={report.workflowStatus} />
       <AuditTimeline entityType="weekly_report" entityId={report.id} />
     </div>
   );

@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { listActiveProperties } from "@/server/services/metrics-service";
-import { getReviewQueue } from "@/server/services/review-service";
+import { getReviewQueue, reviewQueueCounts } from "@/server/services/review-service";
 import { listCategories } from "@/server/services/checklist-service";
 import { reviewFilterSchema } from "@/lib/validation";
-import { StatusBadge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { ReviewFilters } from "@/features/review/review-filters";
+import { PageHeader } from "@/components/shell/page-header";
+import { ModeSwitcher } from "@/components/theme/mode-switcher";
+import { ReviewQueue } from "@/features/review/review-queue";
 import { PublishWeekButton } from "@/features/review/publish-week-button";
-import { formatDateTime } from "@/lib/utils";
 import { currentWeekStart } from "@/lib/week";
 import type { WorkflowStatus } from "@/lib/roles";
 
@@ -24,13 +22,17 @@ export default async function ReviewQueuePage({
   const parsed = reviewFilterSchema.safeParse(raw);
   const filters = parsed.success ? parsed.data : reviewFilterSchema.parse({});
 
-  const [propertiesList, categories] = await Promise.all([listActiveProperties(), listCategories()]);
+  const [propertiesList, categories, counts] = await Promise.all([
+    listActiveProperties(),
+    listCategories(),
+    reviewQueueCounts(),
+  ]);
   const selectedProperty = propertiesList.find((p) => p.code === filters.property);
 
   const queue = await getReviewQueue({
     propertyId: selectedProperty?.id,
     type: filters.type,
-    status: filters.status as WorkflowStatus | undefined,
+    status: (filters.status as WorkflowStatus | undefined) ?? "SUBMITTED",
     categoryKey: filters.category,
     week: filters.week,
     page: filters.page,
@@ -38,77 +40,44 @@ export default async function ReviewQueuePage({
 
   return (
     <div data-testid="review-queue">
-      <div className="mb-1 text-[11.5px] font-semibold tracking-wider text-muted uppercase">
-        Management Review
-      </div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-[22px] font-bold">Review Queue</h2>
-        <PublishWeekButton
-          properties={propertiesList.map((p) => ({ id: p.id, name: p.name }))}
-          defaultWeek={filters.week ?? currentWeekStart()}
-        />
-      </div>
-
-      <ReviewFilters
-        properties={propertiesList.map((p) => ({ code: p.code, name: p.name }))}
-        categories={categories.map((c) => ({ key: c.key, name: c.name }))}
+      <PageHeader
+        eyebrow="Management Review"
+        title="Review Queue"
+        meta={
+          <>
+            {counts.SUBMITTED} awaiting review · {counts.RETURNED} returned · {counts.APPROVED} approved
+            and ready to publish
+          </>
+        }
+        controls={
+          <>
+            <PublishWeekButton
+              properties={propertiesList.map((p) => ({ id: p.id, name: p.name }))}
+              defaultWeek={filters.week ?? currentWeekStart()}
+            />
+            <ModeSwitcher />
+          </>
+        }
       />
 
-      <Card className="mt-4 overflow-hidden">
-        {queue.items.length === 0 ? (
-          <div className="px-5 py-10 text-center text-[13px] text-muted">
-            Nothing matches these filters. Submitted items appear here for review.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="z-table">
-              <thead>
-                <tr>
-                  <th>Property</th>
-                  <th>Type</th>
-                  <th>Date / Week</th>
-                  <th>Submitted By</th>
-                  <th>Submitted At</th>
-                  <th style={{ width: 80 }}>Issues</th>
-                  <th style={{ width: 90 }}>Evidence</th>
-                  <th style={{ width: 100 }}>Status</th>
-                  <th style={{ width: 70 }} />
-                </tr>
-              </thead>
-              <tbody>
-                {queue.items.map((item) => (
-                  <tr key={`${item.kind}-${item.id}`} data-testid={`queue-row-${item.id}`}>
-                    <td className="font-semibold">{item.propertyName}</td>
-                    <td>{item.title}</td>
-                    <td className="font-mono text-xs">{item.dateLabel}</td>
-                    <td>{item.submittedByName ?? "—"}</td>
-                    <td className="font-mono text-xs text-muted">{formatDateTime(item.submittedAt)}</td>
-                    <td className="text-center font-mono">{item.issueCount}</td>
-                    <td className="text-center font-mono">{item.evidenceCount}</td>
-                    <td>
-                      <StatusBadge status={item.status} />
-                    </td>
-                    <td>
-                      <Link
-                        href={`/review/${item.kind}/${item.id}`}
-                        className="text-[12.5px] font-bold text-accent-dark hover:underline"
-                      >
-                        Open →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-      {queue.total > queue.pageSize ? (
-        <p className="mt-3 text-center text-xs text-muted">
-          Showing {queue.items.length} of {queue.total} items — refine filters or use page navigation
-          (`?page=`).
-        </p>
-      ) : null}
+      <ReviewQueue
+        items={queue.items.map((i) => ({
+          kind: i.kind,
+          id: i.id,
+          propertyName: i.propertyName,
+          title: i.title,
+          dateLabel: i.dateLabel,
+          status: i.status,
+          submittedByName: i.submittedByName,
+          submittedAt: i.submittedAt ? i.submittedAt.toISOString() : null,
+          issueCount: i.issueCount,
+          evidenceCount: i.evidenceCount,
+        }))}
+        counts={counts}
+        properties={propertiesList.map((p) => ({ code: p.code, name: p.name }))}
+        categories={categories.map((c) => ({ key: c.key, name: c.name }))}
+        total={queue.total}
+      />
     </div>
   );
 }

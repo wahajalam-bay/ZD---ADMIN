@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { listAllProperties } from "@/server/services/admin-service";
 import { PropertiesAdmin } from "@/features/admin/properties-admin";
+import { PageHeader } from "@/components/shell/page-header";
 
 export const metadata: Metadata = { title: "Properties" };
 export const dynamic = "force-dynamic";
@@ -9,14 +10,11 @@ export default async function AdminPropertiesPage() {
   const propertiesList = await listAllProperties();
   return (
     <div>
-      <div className="mb-1 text-[11.5px] font-semibold tracking-wider text-muted uppercase">
-        Administration
-      </div>
-      <h2 className="mb-1 text-[22px] font-bold">Properties</h2>
-      <p className="mb-4 text-[13px] text-muted">
-        Property master data drives navigation, permissions and every dashboard. Properties with
-        historical records cannot be deleted — deactivate them instead.
-      </p>
+      <PageHeader
+        eyebrow="Administration"
+        title="Properties"
+        meta="Master data drives navigation, permissions and every dashboard. Properties with historical records are deactivated, never deleted."
+      />
       <PropertiesAdmin
         properties={propertiesList.map((p) => ({
           id: p.id,

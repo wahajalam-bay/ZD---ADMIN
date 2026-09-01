@@ -309,7 +309,7 @@ export async function runDemoSeed() {
     }
   }
 
-  // ── Checklist entries (published, with one flagged NEO bottleneck) ──────
+  // ── Checklist entries (published, with one flagged Opal bottleneck) ─────
   const categories = await db.select().from(checklistCategories);
   const catByKey = new Map(categories.map((c) => [c.key, c]));
 

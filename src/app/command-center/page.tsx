@@ -1,22 +1,29 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { requirePageUser } from "@/server/auth/session";
 import { canReview } from "@/lib/roles";
 import {
+  attentionFeed,
+  complianceForWeek,
+  lastPublishedAt,
+  openIssueCounts,
   portfolioMetrics,
   PREVIEW,
   PUBLISHED_ONLY,
+  taskTrend,
 } from "@/server/services/metrics-service";
 import {
   listKnownWeeks,
   resolveSelectedWeek,
   weekDataState,
 } from "@/server/services/reporting-week-service";
-import { WeekSelector } from "@/components/shell/week-selector";
-import { Card, Kpi } from "@/components/ui/card";
-import { TrackingBadge } from "@/components/ui/badge";
-import { PropertyTasksBar, DonutStat, CHART_COLORS } from "@/features/command-center/charts";
-import { formatNumber } from "@/lib/utils";
+import { PageHeader } from "@/components/shell/page-header";
+import { ReportingControls, PreviewNotice } from "@/components/shell/reporting-controls";
+import { ModeSwitcher } from "@/components/theme/mode-switcher";
+import { SectionHeader } from "@/components/ui/section-header";
+import { Icon, type IconName } from "@/components/ui/icon";
+import { PortfolioBoard } from "@/features/command-center/portfolio-board";
+import { addDays, weekRangeLabel } from "@/lib/week";
+import { formatDateTime, formatNumber } from "@/lib/utils";
 import { mediaUrl } from "@/lib/media-url";
 
 export const metadata: Metadata = { title: "Portfolio Overview" };
@@ -25,7 +32,7 @@ export const dynamic = "force-dynamic";
 export default async function PortfolioOverviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ week?: string; preview?: string }>;
+  searchParams: Promise<{ week?: string; preview?: string; focus?: string }>;
 }) {
   const params = await searchParams;
   const user = await requirePageUser();
@@ -34,134 +41,151 @@ export default async function PortfolioOverviewPage({
   const statuses = previewOn ? PREVIEW : PUBLISHED_ONLY;
 
   const week = await resolveSelectedWeek(params.week);
-  const [weeks, state, metrics] = await Promise.all([
-    listKnownWeeks(),
-    weekDataState(week),
-    portfolioMetrics(week, statuses),
-  ]);
+  const prevWeek = addDays(week, -7);
 
-  const chartData = metrics.perProperty.map((p) => ({
-    name: p.property.name,
-    completed: p.stats?.tasks.completed ?? 0,
-    inProcess: p.stats?.tasks.inProcess ?? 0,
+  const [weeks, state, metrics, prevMetrics, attention, issueCounts, prevIssueCounts, complianceMap, publishedAt, trend] =
+    await Promise.all([
+      listKnownWeeks(),
+      weekDataState(week),
+      portfolioMetrics(week, statuses),
+      portfolioMetrics(prevWeek, statuses),
+      attentionFeed(week, statuses),
+      openIssueCounts(week, statuses),
+      openIssueCounts(prevWeek, statuses),
+      complianceForWeek(week, statuses),
+      lastPublishedAt(),
+      taskTrend(week, statuses, 6),
+    ]);
+
+  // Portfolio compliance = clean vs total published checklist entries.
+  const complianceTotals = [...complianceMap.values()].reduce(
+    (acc, c) => ({ clean: acc.clean + c.clean, total: acc.total + c.total }),
+    { clean: 0, total: 0 },
+  );
+  const compliancePct =
+    complianceTotals.total > 0
+      ? Math.round((complianceTotals.clean / complianceTotals.total) * 100)
+      : null;
+  const prevOpenIssues = [...prevIssueCounts.values()].reduce((a, b) => a + b, 0);
+
+  const properties = metrics.perProperty.map(({ property, stats, compliance }) => ({
+    code: property.code,
+    name: property.name,
+    meta:
+      [property.location, property.propertyType, property.areaLabel].filter(Boolean).join(" · ") ||
+      "Master data pending",
+    heroUrl: property.heroImageKey ? mediaUrl(property.heroImageKey) : null,
+    tracking: stats?.trackingStatus ?? null,
+    completed: stats?.tasks.completed ?? 0,
+    inProcess: stats?.tasks.inProcess ?? 0,
+    compliancePct: compliance.pct,
+    openIssues: issueCounts.get(property.id) ?? 0,
+    photos: stats?.photoCount ?? 0,
+    summary: stats?.summary || null,
   }));
+
+  const areaLabel =
+    metrics.area.complete && metrics.area.sum > 0
+      ? `${formatNumber(metrics.area.sum)} Sft`
+      : "area data incomplete";
 
   return (
     <div data-testid="portfolio-overview">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="mb-1 text-[11.5px] font-semibold tracking-wider text-muted uppercase">
-            Weekly Admin Properties Review
-          </div>
-          <h2 className="text-[22px] font-bold">Portfolio Overview</h2>
-          <div className="mt-2">
-            <WeekSelector
+      <PageHeader
+        eyebrow="Weekly Admin Properties Review"
+        title="Portfolio Overview"
+        meta={
+          <>
+            {weekRangeLabel(week)} · {metrics.propertyCount} properties · {areaLabel}
+            {publishedAt ? ` · last published ${formatDateTime(publishedAt)}` : ""}
+          </>
+        }
+        controls={
+          <>
+            <ReportingControls
               weeks={weeks}
               selected={week}
               dataState={previewOn && state === "PREVIEW" ? "PREVIEW" : state}
               canPreview={previewAllowed}
               previewOn={previewOn}
             />
-          </div>
-        </div>
-        <div className="text-right text-xs leading-relaxed text-muted">
-          {metrics.perProperty.map((p) => p.property.name.toUpperCase()).join(" · ")}
-        </div>
-      </div>
+            <ModeSwitcher showPresentation />
+          </>
+        }
+      />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Kpi label="Properties" value={metrics.propertyCount} />
-        <Kpi
-          label="Total Area"
-          value={
-            metrics.area.complete && metrics.area.sum > 0 ? formatNumber(metrics.area.sum) : "—"
-          }
-          hint={metrics.area.complete ? "Sft" : "Area data incomplete"}
+      {previewOn ? <PreviewNotice weekStart={week} /> : null}
+
+      <PortfolioBoard
+        weekLabel={weekRangeLabel(week)}
+        kpis={{
+          completed: metrics.tasks.completed,
+          completedPrev: prevMetrics.tasks.completed,
+          inProcess: metrics.tasks.inProcess,
+          inProcessPrev: prevMetrics.tasks.inProcess,
+          compliancePct,
+          complianceClean: complianceTotals.clean,
+          complianceTotal: complianceTotals.total,
+          openIssues: attention.length,
+          openIssuesPrev: prevOpenIssues,
+          photos: metrics.sitePhotos,
+          photosPrev: prevMetrics.sitePhotos,
+          completionPct: metrics.completionPct,
+        }}
+        trend={trend}
+        properties={properties}
+        attention={attention.map((a) => ({
+          responseId: a.responseId,
+          propertyCode: a.propertyCode,
+          propertyName: a.propertyName,
+          categoryName: a.categoryName,
+          itemName: a.itemName,
+          issue: a.issue,
+          severity: a.severity,
+          entryDate: a.entryDate,
+          ageDays: a.ageDays,
+          workflowStatus: a.workflowStatus,
+          evidence: [],
+        }))}
+      />
+
+      <SectionHeader
+        title="Reporting context"
+        icon="property"
+        className="mt-8"
+        description={`Figures reflect ${previewOn ? "approved and published" : "published"} records for ${weekRangeLabel(week)} only — weeks are never mixed.`}
+      />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <ContextTile icon="check" label="Completed tasks" value={`${metrics.tasks.completed} this week`} />
+        <ContextTile icon="loader" label="Still in process" value={`${metrics.tasks.inProcess} carried`} />
+        <ContextTile
+          icon="shield"
+          label="Checklist entries measured"
+          value={`${complianceTotals.total} published`}
         />
-        <Kpi label="Completed This Week" value={metrics.tasks.completed} tone="ok" />
-        <Kpi label="In Process" value={metrics.tasks.inProcess} tone="warn" />
-        <Kpi label="Site Photos" value={metrics.sitePhotos} />
       </div>
+    </div>
+  );
+}
 
-      <div className="secbar">
-        <h3>Status Overview</h3>
-        <div className="line" />
-      </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-5">
-          <h4 className="mb-3 text-[12px] font-bold tracking-wide text-muted uppercase">
-            Completed vs In Process — by Property
-          </h4>
-          <PropertyTasksBar data={chartData} />
-        </Card>
-        <Card className="p-5">
-          <h4 className="mb-3 text-[12px] font-bold tracking-wide text-muted uppercase">
-            Portfolio Task Status
-          </h4>
-          <DonutStat
-            ariaLabel="Portfolio task status"
-            slices={[
-              { name: "Completed", value: metrics.tasks.completed, color: CHART_COLORS.TEAL },
-              { name: "In Process", value: metrics.tasks.inProcess, color: CHART_COLORS.AMBER },
-            ]}
-            centerValue={metrics.completionPct === null ? "—" : `${metrics.completionPct}%`}
-            centerLabel="Done"
-          />
-        </Card>
-      </div>
-
-      <div className="secbar">
-        <h3>Properties</h3>
-        <div className="line" />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {metrics.perProperty.map(({ property, stats, compliance }) => (
-          <Link
-            key={property.id}
-            href={`/command-center/${property.code}`}
-            className="group rounded-card border border-line bg-panel shadow-card transition hover:-translate-y-0.5 hover:shadow-md"
-            data-testid={`property-card-${property.code}`}
-          >
-            {property.heroImageKey ? (
-               
-              <img
-                src={mediaUrl(property.heroImageKey)}
-                alt=""
-                className="h-[150px] w-full rounded-t-card object-cover"
-              />
-            ) : (
-              <div className="flex h-[110px] items-center justify-center rounded-t-card bg-gradient-to-br from-accent-light to-slate-100 font-mono text-3xl font-extrabold text-accent-dark/40">
-                {property.name.slice(0, 2).toUpperCase()}
-              </div>
-            )}
-            <div className="px-4.5 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-[16px] font-bold group-hover:text-accent-dark">{property.name}</h3>
-                <TrackingBadge status={stats?.trackingStatus ?? null} />
-              </div>
-              <div className="mt-1 text-xs text-muted">
-                {[property.location, property.propertyType, property.areaLabel, property.developmentStatus]
-                  .filter(Boolean)
-                  .join(" · ") || "Master data pending"}
-              </div>
-              <div className="mt-3 flex gap-4 text-xs">
-                <span>
-                  <b className="font-mono text-accent-dark">{stats?.tasks.completed ?? 0}</b> completed
-                </span>
-                <span>
-                  <b className="font-mono text-warn">{stats?.tasks.inProcess ?? 0}</b> in process
-                </span>
-                <span>
-                  <b className="font-mono text-info">{stats?.photoCount ?? 0}</b> photos
-                </span>
-                <span>
-                  <b className="font-mono">{compliance.pct === null ? "—" : `${compliance.pct}%`}</b> compliant
-                </span>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
+function ContextTile({
+  icon,
+  label,
+  value,
+}: {
+  icon: IconName;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-tile border border-line bg-panel px-3.5 py-2.5">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-tile bg-panel2 text-muted">
+        <Icon name={icon} className="h-3.5 w-3.5" />
+      </span>
+      <span>
+        <span className="block text-[12.5px] font-semibold text-ink">{value}</span>
+        <span className="t-label text-muted">{label}</span>
+      </span>
     </div>
   );
 }

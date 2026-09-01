@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { listUsers, listAllProperties } from "@/server/services/admin-service";
 import { UsersAdmin } from "@/features/admin/users-admin";
+import { PageHeader } from "@/components/shell/page-header";
 
 export const metadata: Metadata = { title: "Users" };
 export const dynamic = "force-dynamic";
@@ -9,10 +10,11 @@ export default async function AdminUsersPage() {
   const [users, propertiesList] = await Promise.all([listUsers(), listAllProperties()]);
   return (
     <div>
-      <div className="mb-1 text-[11.5px] font-semibold tracking-wider text-muted uppercase">
-        Administration
-      </div>
-      <h2 className="mb-4 text-[22px] font-bold">Users</h2>
+      <PageHeader
+        eyebrow="Administration"
+        title="Users"
+        meta={`${users.length} accounts · site users are restricted to one property`}
+      />
       <UsersAdmin
         users={users.map((u) => ({
           id: u.id,

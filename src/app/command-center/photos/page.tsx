@@ -8,19 +8,16 @@ import {
   weekDataState,
 } from "@/server/services/reporting-week-service";
 import { evidencePhotosForWeek, weeklyPhotosForWeek } from "@/server/services/media-service";
-import { WeekSelector } from "@/components/shell/week-selector";
+import { PageHeader } from "@/components/shell/page-header";
+import { ReportingControls, PreviewNotice } from "@/components/shell/reporting-controls";
+import { ModeSwitcher } from "@/components/theme/mode-switcher";
 import { PhotosAlbums } from "@/features/command-center/photos-albums";
+import { weekRangeLabel } from "@/lib/week";
 import { mediaUrl } from "@/lib/media-url";
 
-export const metadata: Metadata = { title: "Progress Photos" };
+export const metadata: Metadata = { title: "Progress Media" };
 export const dynamic = "force-dynamic";
 
-/**
- * Media page: one album per property. Inside each album the photos are
- * organised like the property's checklist board (Site Overview header +
- * sorted caption albums covering site photos and checklist/maintenance sheet
- * images), with damage-report evidence in its own clearly-marked section.
- */
 export default async function PhotosPage({
   searchParams,
 }: {
@@ -49,7 +46,7 @@ export default async function PhotosPage({
         url: mediaUrl(ph.storageKey),
         thumbUrl: mediaUrl(ph.thumbnailKey),
         caption: ph.caption,
-        context: `${p.name} · ${ph.context}`,
+        context: ph.context,
       }));
     const evidence = evidencePhotos
       .filter((ph) => ph.propertyId === p.id)
@@ -69,25 +66,36 @@ export default async function PhotosPage({
     };
   });
 
+  const total = weeklyPhotos.length + evidencePhotos.length;
+
   return (
     <div>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="mb-1 text-[11.5px] font-semibold tracking-wider text-muted uppercase">Media</div>
-          <h2 className="text-[22px] font-bold">Site Albums</h2>
-          <div className="mt-2">
-            <WeekSelector
+      <PageHeader
+        eyebrow="Media"
+        title="Progress Media"
+        meta={
+          <>
+            {weekRangeLabel(week)} · {weeklyPhotos.length} progress photos ·{" "}
+            {evidencePhotos.length} checklist evidence · {total} total
+          </>
+        }
+        controls={
+          <>
+            <ReportingControls
               weeks={weeks}
               selected={week}
               dataState={previewOn && state === "PREVIEW" ? "PREVIEW" : state}
               canPreview={previewAllowed}
               previewOn={previewOn}
             />
-          </div>
-        </div>
-      </div>
+            <ModeSwitcher />
+          </>
+        }
+      />
 
-      <PhotosAlbums albums={albums} />
+      {previewOn ? <PreviewNotice weekStart={week} /> : null}
+
+      <PhotosAlbums albums={albums} weekLabel={weekRangeLabel(week)} />
     </div>
   );
 }

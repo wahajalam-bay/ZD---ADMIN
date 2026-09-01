@@ -1,9 +1,18 @@
 import Link from "next/link";
-import { getPropertyByCode } from "@/server/permissions";
 import { notFound } from "next/navigation";
+import {
+  ArrowRight,
+  RotateCcw,
+  } from "lucide-react";
+import { getPropertyByCode } from "@/server/permissions";
 import { entryHomeStats } from "@/server/services/entry-home-service";
-import { Card, Kpi } from "@/components/ui/card";
-import { StatusBadge, TrackingBadge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/shell/page-header";
+import { Card } from "@/components/ui/card";
+import { KpiCard, KpiStrip } from "@/components/ui/kpi-card";
+import { StatusBadge, TrackingBadge } from "@/components/ui/status-badge";
+import { SectionHeader } from "@/components/ui/section-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { weekRangeLabel } from "@/lib/week";
 import { formatDateTime } from "@/lib/utils";
 
@@ -14,10 +23,10 @@ const ACTION_LABELS: Record<string, string> = {
   "checklist.updated": "Checklist updated",
   "checklist.submitted": "Checklist submitted",
   "checklist.resubmitted": "Checklist resubmitted",
-  "checklist.returned": "Checklist returned",
+  "checklist.returned": "Checklist returned for correction",
   "checklist.approved": "Checklist approved",
   "checklist.published": "Checklist published",
-  "weekly.created": "Weekly report created",
+  "weekly.created": "Weekly report started",
   "weekly.updated": "Weekly report updated",
   "weekly.submitted": "Weekly report submitted",
   "weekly.resubmitted": "Weekly report resubmitted",
@@ -25,12 +34,13 @@ const ACTION_LABELS: Record<string, string> = {
   "weekly.approved": "Weekly report approved",
   "weekly.published": "Weekly report published",
   "photo.evidence.added": "Evidence photo added",
-  "photo.evidence.deleted": "Evidence photo deleted",
+  "photo.evidence.deleted": "Evidence photo removed",
   "photo.weekly.added": "Progress photo added",
-  "photo.weekly.deleted": "Progress photo deleted",
-  "publication.week": "Week published",
+  "photo.weekly.deleted": "Progress photo removed",
+  "publication.week": "Reporting week published",
 };
 
+/** "My Site" operations view for the site team (audit E2). */
 export default async function EntryOverviewPage({
   params,
 }: {
@@ -40,77 +50,101 @@ export default async function EntryOverviewPage({
   const property = await getPropertyByCode(propertyCode);
   if (!property) notFound();
   const stats = await entryHomeStats(property.id);
+  const pct =
+    stats.categoriesTotal > 0 ? Math.round((stats.filedToday / stats.categoriesTotal) * 100) : 0;
 
   return (
     <div data-testid="entry-overview">
-      <p className="mb-4 text-[13px] text-muted">
-        Reporting week <b className="font-mono">{weekRangeLabel(stats.weekStart)}</b> · today{" "}
-        <b className="font-mono">{stats.today}</b>
-      </p>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi
-          label="Filed today"
-          value={`${stats.filedToday}/${stats.categoriesTotal}`}
-          tone={stats.filedToday === stats.categoriesTotal ? "ok" : "ink"}
-        />
-        <Kpi label="Drafts today" value={stats.draftToday} tone="warn" />
-        <Kpi
-          label="Pending corrections"
-          value={stats.returnedThisWeek}
-          tone={stats.returnedThisWeek > 0 ? "bad" : "ink"}
-        />
-        <Card className="px-4 py-3.5">
-          <div className="mb-1 text-[10.5px] font-bold tracking-wider text-muted uppercase">
-            Weekly report
-          </div>
+      <PageHeader
+        eyebrow="Site Operations"
+        title={property.name}
+        meta={
+          <>
+            Today {stats.today} · reporting week {weekRangeLabel(stats.weekStart)}
+          </>
+        }
+        controls={
           <div className="flex items-center gap-2">
             <StatusBadge status={stats.weeklyReport?.workflowStatus ?? null} />
             {stats.weeklyReport ? (
               <TrackingBadge status={stats.weeklyReport.trackingStatus} />
             ) : null}
           </div>
-        </Card>
-      </div>
+        }
+      />
 
-      <div className="mt-5 grid gap-3.5 sm:grid-cols-2">
+      {stats.returnedThisWeek > 0 ? (
         <Link
+          href={`/entry/${property.code}/checklists?filter=RETURNED`}
+          className="mb-5 flex items-center gap-3 rounded-card border border-bad/40 bg-bad-bg px-4 py-3 text-[12.5px] text-bad transition-colors hover:border-bad"
+          data-testid="returned-banner"
+        >
+          <RotateCcw className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="flex-1">
+            <b>
+              {stats.returnedThisWeek} submission{stats.returnedThisWeek > 1 ? "s were" : " was"}{" "}
+              returned for correction.
+            </b>{" "}
+            Amend and resubmit so the week can be published.
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-1 font-bold">
+            Fix now <ArrowRight className="h-3 w-3" aria-hidden />
+          </span>
+        </Link>
+      ) : null}
+
+      <KpiStrip cols={4} className="mb-6">
+        <KpiCard
+          label="Today's checklists"
+          value={`${stats.filedToday}/${stats.categoriesTotal}`}
+          icon="clipboard"
+          tone={stats.filedToday === stats.categoriesTotal ? "green" : "neutral"}
+          progress={pct}
+        />
+        <KpiCard label="Drafts" value={stats.draftToday} icon="draft" tone="orange" />
+        <KpiCard
+          label="Returned"
+          value={stats.returnedThisWeek}
+          icon="returned"
+          tone={stats.returnedThisWeek > 0 ? "red" : "neutral"}
+        />
+        <KpiCard
+          label="Weekly report"
+          value={stats.weeklyReport ? stats.weeklyReport.workflowStatus.toLowerCase() : "not started"}
+          icon="scroll"
+          tone={stats.weeklyReport?.workflowStatus === "PUBLISHED" ? "green" : "blue"}
+        />
+      </KpiStrip>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <PrimaryAction
           href={`/entry/${property.code}/checklists`}
-          className="rounded-card border border-line bg-panel px-5 py-4 shadow-card transition hover:-translate-y-0.5 hover:border-accent"
-        >
-          <h3 className="text-[15px] font-bold">Daily Checklists →</h3>
-          <p className="mt-1 text-xs text-muted">
-            {stats.categoriesTotal} categories · fill in OP/CL per item, flag defects, attach evidence
-            photos.
-          </p>
-        </Link>
-        <Link
+          icon="clipboard"
+          title="Daily Checklists"
+          detail={`${stats.categoriesTotal} categories · mark OP/CL, flag issues, attach evidence.`}
+        />
+        <PrimaryAction
           href={`/entry/${property.code}/weekly`}
-          className="rounded-card border border-line bg-panel px-5 py-4 shadow-card transition hover:-translate-y-0.5 hover:border-accent"
-        >
-          <h3 className="text-[15px] font-bold">Weekly Report →</h3>
-          <p className="mt-1 text-xs text-muted">
-            Tracking status, management summary, task updates and progress photos for the week.
-          </p>
-        </Link>
+          icon="calendar"
+          title="Weekly Report"
+          detail="Tracking status, management summary, task updates and progress photos."
+        />
       </div>
 
-      <div className="secbar">
-        <h3>Recent activity</h3>
-        <div className="line" />
-      </div>
+      <SectionHeader className="mt-8" title="Recent activity" icon="activity" />
       <Card className="overflow-hidden">
         {stats.recentActivity.length === 0 ? (
-          <div className="px-5 py-7 text-center text-[13px] text-muted">No activity yet.</div>
+          <EmptyState
+            compact
+            title="No activity recorded for this site yet"
+            detail="Saving a draft, submitting a checklist or uploading a photo will appear here."
+          />
         ) : (
-          <ul>
+          <ul className="divide-y divide-line">
             {stats.recentActivity.map(({ log, actorName }) => (
-              <li
-                key={log.id}
-                className="flex items-center justify-between gap-3 border-b border-line px-5 py-2.5 text-[13px] last:border-b-0"
-              >
-                <span>
-                  <b>{ACTION_LABELS[log.action] ?? log.action}</b>
+              <li key={log.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-[12.5px]">
+                <span className="min-w-0">
+                  <b className="text-ink">{ACTION_LABELS[log.action] ?? log.action}</b>
                   {actorName ? <span className="text-muted"> · {actorName}</span> : null}
                 </span>
                 <span className="shrink-0 font-mono text-[11px] text-muted">
@@ -122,5 +156,34 @@ export default async function EntryOverviewPage({
         )}
       </Card>
     </div>
+  );
+}
+
+function PrimaryAction({
+  href,
+  icon,
+  title,
+  detail,
+}: {
+  href: string;
+  icon: IconName;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-start gap-3 rounded-card border border-line bg-panel p-4 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:shadow-card-2"
+    >
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-tile bg-accent-light text-accent-dark">
+        <Icon name={icon} className="h-4.5 w-4.5" />
+      </span>
+      <span className="min-w-0">
+        <span className="flex items-center gap-1.5 text-[14.5px] font-bold text-ink group-hover:text-accent-dark">
+          {title} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+        </span>
+        <span className="mt-0.5 block text-[11.5px] leading-relaxed text-muted">{detail}</span>
+      </span>
+    </Link>
   );
 }

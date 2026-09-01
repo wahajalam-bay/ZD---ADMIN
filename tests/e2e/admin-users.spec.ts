@@ -38,9 +38,10 @@ test("manager creates, assigns and disables a site user with audit records", asy
   await expect(userPage.getByTestId("access-denied")).toBeVisible();
   await userContext.close();
 
-  // Disable the account.
+  // Disable the account through the row's ⋯ action menu.
   page.once("dialog", (d) => d.accept());
-  await page.getByTestId(`toggle-disabled-${email}`).click();
+  await page.getByTestId(`user-actions-${email}`).click();
+  await page.getByRole("menuitem", { name: "Disable account" }).click();
   await expectToast(page, "disabled");
   await expect(row).toContainText("Disabled");
 
@@ -54,9 +55,9 @@ test("manager creates, assigns and disables a site user with audit records", asy
   await expect(disabledPage.getByRole("alert")).toBeVisible();
   await disabledContext.close();
 
-  // Audit log recorded both actions.
+  // Audit log recorded both actions (rendered as human sentences).
   await page.goto("/admin/audit?action=user.created");
   await expect(page.getByTestId("audit-table")).toContainText(email);
   await page.goto("/admin/audit?action=user.disabled");
-  await expect(page.getByTestId("audit-table")).toContainText("user.disabled");
+  await expect(page.getByTestId("audit-table")).toContainText("Disabled a user");
 });

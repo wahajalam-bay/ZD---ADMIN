@@ -33,18 +33,19 @@ test("site user files a checklist with defect + exact-point evidence and submits
   await page.goto(`/entry/opal/checklists/genset_operational?date=${entryDate}`);
   await expect(page.getByTestId("entry-table")).toBeVisible();
 
-  // Mark every row OP+CL complete.
+  // Mark every row OP+CL complete (OP/CL are accessible switch controls).
   const rowCount = await page.locator('[data-testid^="item-row-"]').count();
   for (let i = 0; i < rowCount; i++) {
     const row = page.getByTestId(`item-row-${i}`);
-    await row.locator('input[type="checkbox"]').nth(0).check();
-    await row.locator('input[type="checkbox"]').nth(1).check();
+    for (const sw of await row.getByRole("switch").all()) {
+      if ((await sw.getAttribute("aria-checked")) !== "true") await sw.click();
+    }
   }
 
   // Row 11 = "Emergency Stop Functional": defect + HIGH severity + photo.
   const defectRow = page.getByTestId("item-row-11");
   await expect(defectRow).toContainText("Emergency Stop Functional");
-  await defectRow.locator('input[placeholder="Defect / comment"]').fill(DEFECT_TEXT);
+  await defectRow.getByLabel("Emergency Stop Functional issue or comment").fill(DEFECT_TEXT);
   await defectRow.locator("select").selectOption("HIGH");
 
   const [chooser] = await Promise.all([
@@ -60,7 +61,7 @@ test("site user files a checklist with defect + exact-point evidence and submits
 
   // Row 1 = "Generator Room Camera": unrelated defect WITHOUT a photo.
   const otherRow = page.getByTestId("item-row-1");
-  await otherRow.locator('input[placeholder="Defect / comment"]').fill(CLEAN_ISSUE_TEXT);
+  await otherRow.getByLabel("Generator Room Camera issue or comment").fill(CLEAN_ISSUE_TEXT);
   await otherRow.locator("select").selectOption("MEDIUM");
 
   // Sign-off + save draft.
@@ -80,7 +81,7 @@ test("site user files and submits the weekly report for the same week", async ({
   await expect(page.getByTestId("weekly-report-form")).toBeVisible();
 
   await page.getByRole("radio", { name: "Watch" }).click();
-  await page.getByLabel("One-line summary (shown on the dashboard)").fill(SUMMARY_TEXT);
+  await page.getByLabel("One-line management summary").fill(SUMMARY_TEXT);
   await page.getByTestId("add-task").click();
   await page.getByLabel("Task 1 description").fill(TASK_TEXT);
   await page.getByLabel("Task 1 status").selectOption("IN_PROCESS");
@@ -95,9 +96,12 @@ test("site user files and submits the weekly report for the same week", async ({
 test("AM returns the checklist; site user amends and resubmits", async ({ page }) => {
   await login(page, ACCOUNTS.am);
   await page.goto(`/review?type=checklist&week=${week}`);
-  const row = page.locator("tr").filter({ hasText: "Generator Checklist" }).filter({ hasText: entryDate });
+  const row = page
+    .locator('[data-testid^="queue-row-"]')
+    .filter({ hasText: "Generator Checklist" })
+    .filter({ hasText: entryDate });
   await expect(row.first()).toBeVisible();
-  await row.first().getByRole("link", { name: "Open →" }).click();
+  await row.first().click();
   await expect(page.getByTestId("review-checklist-detail")).toBeVisible();
   await expect(page.getByText(DEFECT_TEXT)).toBeVisible();
 
@@ -111,7 +115,10 @@ test("AM returns the checklist; site user amends and resubmits", async ({ page }
   await login(page, ACCOUNTS.opal);
   await page.goto(`/entry/opal/checklists/genset_operational?date=${entryDate}`);
   await expect(page.getByTestId("return-reason")).toContainText("double-check the emergency stop");
-  await page.getByTestId("item-row-11").locator('input[placeholder="Defect / comment"]').fill(`${DEFECT_TEXT} — re-verified`);
+  await page
+    .getByTestId("item-row-11")
+    .getByLabel("Emergency Stop Functional issue or comment")
+    .fill(`${DEFECT_TEXT} — re-verified`);
   page.once("dialog", (d) => d.accept());
   await page.getByTestId("submit-entry").click();
   await expectToast(page, "Submitted for review");
@@ -123,11 +130,10 @@ test("AM approves and publishes checklist + weekly report", async ({ page }) => 
   // Checklist: approve then publish.
   await page.goto(`/review?type=checklist&week=${week}`);
   await page
-    .locator("tr")
+    .locator('[data-testid^="queue-row-"]')
     .filter({ hasText: "Generator Checklist" })
     .filter({ hasText: entryDate })
     .first()
-    .getByRole("link", { name: "Open →" })
     .click();
   await page.getByTestId("approve-btn").click();
   await expectToast(page, "Submission approved");
@@ -137,11 +143,10 @@ test("AM approves and publishes checklist + weekly report", async ({ page }) => 
   // Weekly report: approve then publish.
   await page.goto(`/review?type=weekly&week=${week}`);
   await page
-    .locator("tr")
+    .locator('[data-testid^="queue-row-"]')
     .filter({ hasText: "Weekly Report" })
     .filter({ hasText: week })
     .first()
-    .getByRole("link", { name: "Open →" })
     .click();
   await expect(page.getByTestId("review-weekly-detail")).toBeVisible();
   await page.getByTestId("approve-btn").click();
@@ -171,18 +176,32 @@ test("Command Center shows published data with EXACT evidence linkage", async ({
   const evidenceButton = defectRow.locator('button[data-testid^="evidence-btn-"]');
   await expect(evidenceButton).toContainText("1 photo");
   await evidenceButton.click();
-  const lightboxImg = page.locator('div[role="dialog"] img[src^="/api/media/"]');
+
+  // The slide-in panel shows ONLY this response's evidence…
+  const panelThumbs = page.locator('[data-testid^="panel-evidence-"] img');
+  await expect(panelThumbs).toHaveCount(1);
+  expect(await panelThumbs.first().getAttribute("src")).toBe(uploadedThumbSrc);
+
+  // …and opening it shows the exact full-size photograph that was uploaded.
+  await panelThumbs.first().click();
+  const lightboxImg = page.getByTestId("lightbox-image");
   await expect(lightboxImg).toBeVisible();
-  const mainSrc = await lightboxImg.getAttribute("src");
   // Thumb key = "<key>-thumb.jpg" of the main key — same random object id.
   const objectId = uploadedThumbSrc!.replace("-thumb", "");
-  expect(mainSrc).toBe(objectId);
+  expect(await lightboxImg.getAttribute("src")).toBe(objectId);
+  await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
 
-  // …and the unrelated issue has NO evidence attached to it.
+  // …and the unrelated issue has NO evidence attached to it: no photo-count
+  // button, and its panel shows zero photographs (never the other row's).
   await expect(unrelatedRow.locator('button[data-testid^="evidence-btn-"]')).toHaveCount(0);
-  await expect(unrelatedRow).toContainText("—");
+  await expect(unrelatedRow).toContainText("No evidence");
+  await unrelatedRow.getByRole("button", { name: "No evidence" }).click();
+  await expect(page.getByRole("dialog")).toContainText("No photograph attached to this checklist point");
+  await expect(page.locator('[data-testid^="panel-evidence-"]')).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
-  // Compliance donut reflects live entries for this week (1 flagged of 1).
-  await expect(page.getByText("Checklist Compliance — Opal")).toBeVisible();
+  // Compliance ring reflects live entries for this week (this entry is flagged).
+  await expect(page.getByText("Checklist compliance", { exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Checklist compliance \d+ percent/ })).toBeVisible();
 });

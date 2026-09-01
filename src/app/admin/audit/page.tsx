@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { listAuditLogs, listAllProperties } from "@/server/services/admin-service";
-import { Card } from "@/components/ui/card";
-import { formatDateTime } from "@/lib/utils";
 import { z } from "zod";
+import { listAuditLogs, listAllProperties } from "@/server/services/admin-service";
+import { PageHeader } from "@/components/shell/page-header";
+import { AuditLogTable } from "@/features/admin/audit-log";
+import { formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Audit Log" };
 export const dynamic = "force-dynamic";
@@ -13,6 +14,19 @@ const auditFilterSchema = z.object({
   property: z.string().max(60).optional(),
   action: z.string().max(80).optional(),
 });
+
+/** Pulls the most identifying value out of an audit payload for the row line. */
+function auditSubject(after: unknown, metadata: unknown): string | null {
+  for (const source of [after, metadata]) {
+    if (!source || typeof source !== "object") continue;
+    const o = source as Record<string, unknown>;
+    for (const key of ["email", "title", "code", "name", "reason", "filename", "domain", "weekStart"]) {
+      const v = o[key];
+      if (typeof v === "string" && v.trim()) return v;
+    }
+  }
+  return null;
+}
 
 export default async function AdminAuditPage({
   searchParams,
@@ -43,52 +57,36 @@ export default async function AdminAuditPage({
 
   return (
     <div>
-      <div className="mb-1 text-[11.5px] font-semibold tracking-wider text-muted uppercase">
-        Administration
-      </div>
-      <h2 className="mb-1 text-[22px] font-bold">Audit Log</h2>
-      <p className="mb-4 text-[13px] text-muted">
-        Immutable record of every significant action ({total} events). Filter by property with{" "}
-        <code className="rounded bg-slate-100 px-1 font-mono text-xs">?property=code</code> or action
-        with <code className="rounded bg-slate-100 px-1 font-mono text-xs">?action=name</code>.
-      </p>
+      <PageHeader
+        eyebrow="Administration"
+        title="Audit Log"
+        meta={
+          <>
+            {total} recorded events · immutable history of every submission, approval, publication and
+            administrative change
+          </>
+        }
+      />
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="z-table" data-testid="audit-table">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Action</th>
-                <th>Actor</th>
-                <th>Entity</th>
-                <th>Property</th>
-                <th>Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ log, actorName, propertyName }) => (
-                <tr key={log.id}>
-                  <td className="font-mono text-xs whitespace-nowrap">{formatDateTime(log.createdAt)}</td>
-                  <td className="font-mono text-xs font-bold">{log.action}</td>
-                  <td>{actorName ?? "system"}</td>
-                  <td className="font-mono text-[11px] text-muted">
-                    {log.entityType}
-                    {log.entityId ? `#${log.entityId.slice(0, 8)}` : ""}
-                  </td>
-                  <td>{propertyName ?? "—"}</td>
-                  <td className="max-w-[320px] truncate font-mono text-[11px] text-muted">
-                    {log.afterData ? JSON.stringify(log.afterData) : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <AuditLogTable
+        rows={rows.map(({ log, actorName, propertyName }) => ({
+          id: log.id,
+          action: log.action,
+          actorName,
+          propertyName,
+          entityType: log.entityType,
+          entityId: log.entityId,
+          createdAt: formatDateTime(log.createdAt),
+          subject: auditSubject(log.afterData, log.metadata),
+          detail:
+            log.afterData || log.metadata
+              ? JSON.stringify({ after: log.afterData, meta: log.metadata }, null, 2)
+              : null,
+        }))}
+      />
 
       {totalPages > 1 ? (
-        <div className="mt-3 flex items-center justify-center gap-3 text-[13px]">
+        <nav className="mt-4 flex items-center justify-center gap-4 text-[12.5px]" aria-label="Audit pagination">
           {filters.page > 1 ? (
             <Link href={pageHref(filters.page - 1)} className="font-bold text-accent-dark hover:underline">
               ← Newer
@@ -102,7 +100,7 @@ export default async function AdminAuditPage({
               Older →
             </Link>
           ) : null}
-        </div>
+        </nav>
       ) : null}
     </div>
   );

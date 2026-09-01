@@ -3,8 +3,9 @@ import { getPropertyByCode } from "@/server/permissions";
 import { requirePageUser } from "@/server/auth/session";
 import { getWeeklyReportView } from "@/server/services/weekly-report-service";
 import { canEditSubmission } from "@/lib/roles";
-import { currentWeekStart, isIsoDate, weekStartOf } from "@/lib/week";
+import { currentWeekStart, isIsoDate, weekRangeLabel, weekStartOf } from "@/lib/week";
 import { mediaUrl } from "@/lib/media-url";
+import { PageHeader } from "@/components/shell/page-header";
 import { WeeklyReportForm } from "@/features/entry/weekly-report-form";
 
 export const dynamic = "force-dynamic";
@@ -27,30 +28,37 @@ export default async function WeeklyReportPage({
   const status = report?.workflowStatus ?? null;
 
   return (
-    <WeeklyReportForm
-      propertyCode={property.code}
-      weekStart={weekStart}
-      status={status}
-      canEdit={canEditSubmission(user.role, status ?? "DRAFT")}
-      reportId={report?.id ?? null}
-      initial={{
-        trackingStatus: report?.trackingStatus ?? "ON_TRACK",
-        summary: report?.summary ?? "",
-        notes: report?.notes ?? "",
-        tasks: tasks.map((t) => ({
-          task: t.task,
-          status: t.status,
-          etaDate: t.etaDate,
-        })),
-      }}
-      media={media.map((m) => ({
-        id: m.id,
-        url: mediaUrl(m.storageKey),
-        thumbUrl: mediaUrl(m.thumbnailKey),
-        caption: m.caption,
-      }))}
-      returnReason={status === "RETURNED" ? (report?.returnReason ?? "") : ""}
-      reviewNotes={report?.reviewNotes ?? ""}
-    />
+    <div>
+      <PageHeader
+        breadcrumb={[
+          { label: property.name, href: `/entry/${property.code}` },
+          { label: "Weekly Report" },
+        ]}
+        title="Weekly Property Update"
+        meta={weekRangeLabel(weekStart)}
+      />
+      <WeeklyReportForm
+        propertyCode={property.code}
+        propertyName={property.name}
+        weekStart={weekStart}
+        status={status}
+        canEdit={canEditSubmission(user.role, status ?? "DRAFT")}
+        reportId={report?.id ?? null}
+        initial={{
+          trackingStatus: report?.trackingStatus ?? "ON_TRACK",
+          summary: report?.summary ?? "",
+          notes: report?.notes ?? "",
+          tasks: tasks.map((t) => ({ task: t.task, status: t.status, etaDate: t.etaDate })),
+        }}
+        media={media.map((m) => ({
+          id: m.id,
+          url: mediaUrl(m.storageKey),
+          thumbUrl: mediaUrl(m.thumbnailKey),
+          caption: m.caption,
+        }))}
+        returnReason={status === "RETURNED" ? (report?.returnReason ?? "") : ""}
+        reviewNotes={report?.reviewNotes ?? ""}
+      />
+    </div>
   );
 }

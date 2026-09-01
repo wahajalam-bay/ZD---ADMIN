@@ -1,11 +1,23 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { Icon, type IconName } from "./icon";
 
-export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+/**
+ * Content card (§1.4: 16px radius, 16–18px padding, sh-1 default).
+ * Cards are for contained information units only — layout grouping uses
+ * section headers on the page background instead.
+ */
+export function Card({
+  className,
+  interactive,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { interactive?: boolean }) {
   return (
     <div
       className={cn(
-        "bg-grad-surface rounded-card border border-line shadow-card transition-shadow duration-300",
+        "rounded-card border border-line bg-panel shadow-card",
+        interactive &&
+          "transition-all duration-300 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-card-2",
         className,
       )}
       {...props}
@@ -13,50 +25,58 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
   );
 }
 
-export function Kpi({
-  label,
-  value,
-  tone = "ink",
-  hint,
+/** Card header row: optional icon chip + title + right-side slot. */
+export function CardHeader({
+  title,
+  subtitle,
+  icon,
+  actions,
   className,
 }: {
-  label: string;
-  value: React.ReactNode;
-  tone?: "ink" | "ok" | "warn" | "bad";
-  hint?: string;
+  title: string;
+  subtitle?: string;
+  icon?: IconName;
+  actions?: React.ReactNode;
   className?: string;
 }) {
-  const tones = {
-    ink: "text-ink",
-    ok: "text-accent-dark",
-    warn: "text-warn",
-    bad: "text-bad",
-  } as const;
-  const bars = {
-    ink: "var(--grad-green)",
-    ok: "var(--grad-green)",
-    warn: "linear-gradient(135deg,#d97706,#b45309)",
-    bad: "linear-gradient(135deg,#ef4444,#dc2626)",
-  } as const;
   return (
-    <Card
-      className={cn(
-        "relative overflow-hidden px-4 py-3.5 hover:-translate-y-1 hover:border-gsoft hover:shadow-hover",
-        "transition-all duration-300",
-        className,
-      )}
-    >
-      {/* Kit KPI accent bar */}
-      <span
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-[3px] opacity-90"
-        style={{ background: bars[tone] }}
-      />
-      <div className="mb-1 text-[10.5px] font-semibold tracking-wider text-muted uppercase">
-        {label}
+    <div className={cn("flex items-start gap-2.5", className)}>
+      {icon ? (
+        <span className="grid h-6.5 w-6.5 shrink-0 place-items-center rounded-tile bg-accent-light p-1 text-accent-dark">
+          <Icon name={icon} className="h-3.5 w-3.5" />
+        </span>
+      ) : null}
+      <div className="min-w-0">
+        <h3 className="t-card text-ink">{title}</h3>
+        {subtitle ? <p className="mt-0.5 text-[11.5px] text-muted">{subtitle}</p> : null}
       </div>
-      <div className={cn("font-mono text-2xl font-bold", tones[tone])}>{value}</div>
-      {hint ? <div className="mt-1 text-[10.5px] font-semibold text-accent-dark">{hint}</div> : null}
+      {actions ? <div className="ms-auto flex shrink-0 items-center gap-2">{actions}</div> : null}
+    </div>
+  );
+}
+
+/** Chart container: title + optional analytical question + chart body. */
+export function ChartCard({
+  title,
+  question,
+  actions,
+  icon,
+  children,
+  className,
+  bodyClassName,
+}: {
+  title: string;
+  question?: string;
+  actions?: React.ReactNode;
+  icon?: IconName;
+  children: React.ReactNode;
+  className?: string;
+  bodyClassName?: string;
+}) {
+  return (
+    <Card className={cn("p-4", className)}>
+      <CardHeader title={title} subtitle={question} icon={icon} actions={actions} />
+      <div className={cn("mt-3", bodyClassName)}>{children}</div>
     </Card>
   );
 }

@@ -3,16 +3,34 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Menu, X } from "lucide-react";
+import {
+  Building2,
+  ClipboardList,
+  Images,
+  LayoutDashboard,
+  ListChecks,
+  LogOut,
+  Menu,
+  PlugZap,
+  ScrollText,
+  Settings2,
+  ShieldCheck,
+  UserCircle,
+  Users,
+  X,
+} from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
+import { ActionMenu } from "@/components/ui/menu";
+import { TrackingDot, type Tracking } from "@/components/ui/status-badge";
 
 export interface NavItem {
   label: string;
   href: string;
   badge?: number;
-  dot?: string | null;
-  meta?: string | null;
+  /** Live weekly tracking status for property rows (null = no report). */
+  tracking?: Tracking | null;
+  icon?: string;
 }
 
 export interface NavSection {
@@ -20,26 +38,40 @@ export interface NavSection {
   items: NavItem[];
 }
 
-const DOT_COLORS: Record<string, string> = {
-  green: "bg-accent",
-  orange: "bg-amber",
-  blue: "bg-info",
-  grey: "bg-slate-400",
+const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  overview: LayoutDashboard,
+  photos: Images,
+  entry: ClipboardList,
+  review: ListChecks,
+  users: Users,
+  properties: Building2,
+  integrations: PlugZap,
+  audit: ScrollText,
+  weekly: ScrollText,
+  checklists: ListChecks,
 };
 
-function SidebarNav({ sections, onNavigate }: { sections: NavSection[]; onNavigate?: () => void }) {
+function SidebarNav({
+  sections,
+  onNavigate,
+}: {
+  sections: NavSection[];
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   return (
-    <nav aria-label="Main navigation" className="flex-1 overflow-y-auto pb-6">
+    <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-2.5 pb-4">
       {sections.map((section) => (
-        <div key={section.label}>
-          <div className="px-5 pt-4 pb-1.5 text-[10.5px] font-bold tracking-[0.08em] text-muted uppercase">
-            {section.label}
-          </div>
+        <div key={section.label} className="mb-1">
+          <div className="t-label px-2.5 pt-4 pb-1.5 text-muted/80">{section.label}</div>
           {section.items.map((item) => {
             const active =
               pathname === item.href ||
-              (item.href !== "/" && item.href.split("/").length > 2 && pathname.startsWith(`${item.href}/`));
+              (item.href !== "/" &&
+                item.href.split("/").length > 2 &&
+                pathname.startsWith(`${item.href}/`));
+            const Icon = item.icon ? ICONS[item.icon] : undefined;
+            const isProperty = item.tracking !== undefined;
             return (
               <Link
                 key={item.href}
@@ -47,26 +79,31 @@ function SidebarNav({ sections, onNavigate }: { sections: NavSection[]; onNaviga
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2 border-l-[3px] px-5 py-2 text-[13.5px] text-ink transition-colors",
+                  "group relative mb-0.5 flex items-center gap-2.5 rounded-input px-2.5 py-[7px] text-[12.8px] transition-colors",
                   active
-                    ? "border-accent bg-accent-light font-bold text-accent-dark"
-                    : "border-transparent hover:bg-accent-light/60",
+                    ? "bg-accent-light font-bold text-accent-dark"
+                    : "text-ink/85 hover:bg-panel2",
                 )}
               >
-                {item.dot ? (
+                {active ? (
                   <span
                     aria-hidden
-                    className={cn("h-2 w-2 shrink-0 rounded-full", DOT_COLORS[item.dot] ?? "bg-slate-300")}
+                    className="absolute inset-y-1.5 start-0 w-[3px] rounded-full bg-accent"
+                  />
+                ) : null}
+                {isProperty ? (
+                  <TrackingDot status={item.tracking ?? null} />
+                ) : Icon ? (
+                  <Icon
+                    className={cn("h-4 w-4 shrink-0", active ? "text-accent-dark" : "text-muted")}
+                    aria-hidden
                   />
                 ) : null}
                 <span className="flex-1 truncate">{item.label}</span>
                 {item.badge ? (
-                  <span className="rounded-full bg-bad px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">
+                  <span className="rounded-full bg-bad px-1.5 py-px font-mono text-[10px] font-bold text-white">
                     {item.badge}
                   </span>
-                ) : null}
-                {item.meta ? (
-                  <span className="font-mono text-[10px] font-semibold text-muted">{item.meta}</span>
                 ) : null}
               </Link>
             );
@@ -77,13 +114,71 @@ function SidebarNav({ sections, onNavigate }: { sections: NavSection[]; onNaviga
   );
 }
 
+function BrandPanel() {
+  return (
+    <div className="mx-2.5 mb-1 flex items-center gap-2.5 rounded-[14px] bg-[var(--grad-header)] px-3 py-2.5 shadow-card-2">
+      <span
+        aria-hidden
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-gradient-to-br from-white to-[#d8f0e2] text-[12px] font-extrabold text-accent-deep shadow-[0_4px_12px_rgba(0,0,0,0.25),inset_0_0_0_1px_rgba(255,255,255,0.6)]"
+      >
+        ZA
+      </span>
+      <div className="min-w-0 leading-tight">
+        <div className="text-[11.5px] font-extrabold tracking-[0.4px] text-white">
+          ZAMEEN DEVELOPMENTS
+        </div>
+        <div className="text-[9.5px] font-semibold tracking-[0.4px] text-white/70">
+          Admin Properties · Command Center
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UserPanel({
+  user,
+  onSignOut,
+}: {
+  user: { name: string; email: string; roleLabel: string };
+  onSignOut: () => void;
+}) {
+  const initials = user.name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+  return (
+    <div className="mx-2.5 mb-2.5 flex items-center gap-2.5 rounded-tile border border-line bg-panel2 px-2.5 py-2">
+      <span
+        aria-hidden
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-[var(--grad-green)] text-[11px] font-bold text-white"
+      >
+        {initials || "U"}
+      </span>
+      <div className="min-w-0 flex-1 leading-tight">
+        <div className="truncate text-[12px] font-bold text-ink">{user.name}</div>
+        <div className="truncate text-[10.5px] text-muted">{user.roleLabel}</div>
+      </div>
+      <ActionMenu
+        label="Account menu"
+        items={[
+          { label: user.email, icon: UserCircle, onSelect: () => undefined },
+          { label: "Sign out", icon: LogOut, onSelect: onSignOut, danger: true },
+        ]}
+      />
+    </div>
+  );
+}
+
 export function ShellClient({
   sections,
   user,
+  demoEnvironment,
   children,
 }: {
   sections: NavSection[];
   user: { name: string; email: string; roleLabel: string };
+  demoEnvironment?: boolean;
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -95,68 +190,54 @@ export function ShellClient({
     router.refresh();
   }
 
-  const brand = (
-    <div className="bg-grad-header mx-3 mb-3 flex items-center gap-3 rounded-[14px] px-3.5 py-3 shadow-card-2">
-      <span
-        aria-hidden
-        className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-gradient-to-br from-white to-[#d8f0e2] text-[13px] font-bold text-accent-deep shadow-[0_4px_12px_rgba(0,0,0,0.25),inset_0_0_0_1px_rgba(255,255,255,0.6)]"
-      >
-        ZA
-      </span>
-      <div className="min-w-0">
-        <h1 className="truncate text-[13.5px] leading-tight font-bold tracking-[0.2px] text-white">
-          Zameen Developments
-        </h1>
-        <div className="text-[9.5px] font-semibold tracking-[0.6px] text-white/70 uppercase">
-          Admin Properties · Command Center
+  const sidebarBody = (onNavigate?: () => void) => (
+    <>
+      <BrandPanel />
+      {demoEnvironment ? (
+        <div className="mx-2.5 mt-1.5 flex items-center gap-1.5 rounded-input border border-warn/30 bg-warn-bg px-2.5 py-1 text-[10px] font-bold text-warn">
+          <ShieldCheck className="h-3 w-3" aria-hidden />
+          DEMO DATA ENVIRONMENT
         </div>
-      </div>
-    </div>
-  );
-
-  const userBlock = (
-    <div className="border-t border-line px-5 py-3">
-      <div className="truncate text-[13px] font-bold">{user.name}</div>
-      <div className="truncate text-[11px] text-muted">{user.roleLabel}</div>
-      <button
-        onClick={signOut}
-        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-ink hover:bg-panel2"
-      >
-        <LogOut className="h-3.5 w-3.5" aria-hidden />
-        Sign out
-      </button>
-    </div>
+      ) : null}
+      <SidebarNav sections={sections} onNavigate={onNavigate} />
+      <UserPanel user={user} onSignOut={signOut} />
+    </>
   );
 
   return (
-    <div className="flex min-h-screen">
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[250px] flex-col border-r border-line bg-panel pt-5 lg:flex">
-        {brand}
-        <SidebarNav sections={sections} />
-        {userBlock}
+    <div className="relative z-10 flex min-h-screen">
+      <a href="#main" className="sr-only sr-only-focusable">
+        Skip to content
+      </a>
+
+      {/* Desktop sidebar — 236px (kit range 230–245) */}
+      <aside className="fixed inset-y-0 start-0 z-40 hidden w-[236px] flex-col border-e border-line bg-panel pt-3 lg:flex">
+        {sidebarBody()}
       </aside>
 
-      {/* Mobile top bar + drawer */}
-      <div className="bg-grad-header fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 py-2.5 shadow-card-2 lg:hidden">
+      {/* Mobile bar + drawer */}
+      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between bg-[var(--grad-header)] px-4 py-2.5 shadow-card-2 lg:hidden">
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden
-            className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-white to-[#d8f0e2] text-[11px] font-bold text-accent-deep"
+            className="grid h-8 w-8 place-items-center rounded-[9px] bg-gradient-to-br from-white to-[#d8f0e2] text-[11px] font-extrabold text-accent-deep"
           >
             ZA
           </span>
-          <div>
-            <div className="text-[12.5px] leading-tight font-bold text-white">Zameen Developments</div>
-            <div className="text-[9px] font-semibold tracking-[0.6px] text-white/70 uppercase">
+          <div className="leading-tight">
+            <div className="text-[11.5px] font-extrabold tracking-[0.4px] text-white">
+              ZAMEEN DEVELOPMENTS
+            </div>
+            <div className="text-[9px] font-semibold tracking-[0.4px] text-white/70">
               Admin Properties
             </div>
           </div>
         </div>
         <button
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((v) => !v)}
-          className="rounded-[10px] border border-white/25 bg-white/12 p-2 text-white"
+          className="rounded-input border border-white/25 bg-white/10 p-2 text-white"
         >
           {mobileOpen ? <X className="h-4 w-4" aria-hidden /> : <Menu className="h-4 w-4" aria-hidden />}
         </button>
@@ -164,21 +245,26 @@ export function ShellClient({
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="absolute inset-0 bg-slate-950/40"
+            className="anim-fade absolute inset-0 bg-[rgba(6,61,36,0.45)]"
             aria-hidden
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 flex w-[270px] flex-col bg-panel pt-5 shadow-2xl">
-            {brand}
-            <SidebarNav sections={sections} onNavigate={() => setMobileOpen(false)} />
-            {userBlock}
+          <aside className="anim-panel absolute inset-y-0 start-0 flex w-[264px] flex-col bg-panel pt-3 shadow-panel">
+            {sidebarBody(() => setMobileOpen(false))}
           </aside>
         </div>
       ) : null}
 
-      <main className="w-full flex-1 px-4 pt-16 pb-16 sm:px-6 lg:ml-[250px] lg:px-8 lg:pt-7">
-        <div className="mx-auto max-w-[1180px]">{children}</div>
+      <main
+        id="main"
+        className="w-full flex-1 px-4 pt-16 pb-14 sm:px-6 lg:ms-[236px] lg:px-8 lg:pt-5"
+      >
+        <div className="mx-auto w-full" style={{ maxWidth: "var(--canvas-max)" }}>
+          {children}
+        </div>
       </main>
     </div>
   );
 }
+
+export { Settings2 };

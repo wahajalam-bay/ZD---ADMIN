@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   checklistCategories,
@@ -45,8 +45,17 @@ export async function getChecklistBoard(propertyId: string, date: string) {
     .from(checklistEntries)
     .where(and(eq(checklistEntries.propertyId, propertyId), eq(checklistEntries.entryDate, date)));
   const byCategory = new Map(entries.map((e) => [e.categoryId, e]));
+
+  // Item counts let the board cards show scale ("20 items") without N+1 reads.
+  const counts = await db
+    .select({ categoryId: checklistItems.categoryId, c: sql<number>`count(*)::int` })
+    .from(checklistItems)
+    .where(eq(checklistItems.active, true))
+    .groupBy(checklistItems.categoryId);
+  const countByCategory = new Map(counts.map((r) => [r.categoryId, r.c]));
+
   return categories.map((c) => ({
-    category: c,
+    category: { ...c, itemCount: countByCategory.get(c.id) ?? 0 },
     entry: byCategory.get(c.id) ?? null,
   }));
 }

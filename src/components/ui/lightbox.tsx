@@ -76,6 +76,7 @@ export function Lightbox({
         ) : null}
         { }
         <img
+          data-testid="lightbox-image"
           src={item.src}
           alt={item.title}
           className="max-h-[70vh] max-w-[90vw] rounded-md object-contain shadow-2xl"

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   checklistCategories,
@@ -20,7 +20,7 @@ import {
   type Severity,
 } from "@/lib/compliance";
 import { aggregateTaskCounts, taskCompletionPct, totalArea, type TaskCounts } from "@/lib/metrics";
-import { weekEndOf } from "@/lib/week";
+import { addDays, weekEndOf } from "@/lib/week";
 import type { WorkflowStatus } from "@/lib/roles";
 
 /**
@@ -276,6 +276,171 @@ export async function bottlenecksForProperty(
         caption: p.caption,
       })),
   }));
+}
+
+export interface AttentionItem {
+  responseId: string;
+  propertyId: string;
+  propertyCode: string;
+  propertyName: string;
+  categoryName: string;
+  categoryKey: string;
+  itemName: string;
+  issue: string;
+  severity: Severity;
+  entryDate: string;
+  /** Whole days since the issue was recorded. */
+  ageDays: number;
+  evidenceCount: number;
+  workflowStatus: WorkflowStatus;
+}
+
+/**
+ * Portfolio-wide "Attention Required" feed: unresolved checklist defects for
+ * the reporting week, most severe first then oldest. Drives the management
+ * exception surface on the Portfolio Overview.
+ */
+export async function attentionFeed(
+  weekStart: string,
+  statuses: VisibleStatuses,
+  opts: { propertyIds?: string[]; limit?: number } = {},
+): Promise<AttentionItem[]> {
+  const weekEnd = weekEndOf(weekStart);
+  const rows = await db
+    .select({
+      responseId: checklistResponses.id,
+      op: checklistResponses.op,
+      cl: checklistResponses.cl,
+      comment: checklistResponses.comment,
+      severity: checklistResponses.severity,
+      entryDate: checklistEntries.entryDate,
+      workflowStatus: checklistEntries.workflowStatus,
+      propertyId: properties.id,
+      propertyCode: properties.code,
+      propertyName: properties.name,
+      categoryName: checklistCategories.name,
+      categoryKey: checklistCategories.key,
+      itemName: checklistItems.name,
+      evidenceCount: sql<number>`(
+        select count(*)::int from ${checklistResponsePhotos} p
+        where p.checklist_response_id = ${checklistResponses.id}
+      )`,
+    })
+    .from(checklistResponses)
+    .innerJoin(checklistEntries, eq(checklistEntries.id, checklistResponses.entryId))
+    .innerJoin(properties, eq(properties.id, checklistEntries.propertyId))
+    .innerJoin(checklistCategories, eq(checklistCategories.id, checklistEntries.categoryId))
+    .innerJoin(checklistItems, eq(checklistItems.id, checklistResponses.checklistItemId))
+    .where(
+      and(
+        inArray(checklistEntries.workflowStatus, statuses),
+        gte(checklistEntries.entryDate, weekStart),
+        lte(checklistEntries.entryDate, weekEnd),
+        ...(opts.propertyIds ? [inArray(checklistEntries.propertyId, opts.propertyIds)] : []),
+      ),
+    );
+
+  const today = new Date();
+  const defects = selectBottlenecks(rows).map((r) => ({
+    responseId: r.responseId,
+    propertyId: r.propertyId,
+    propertyCode: r.propertyCode,
+    propertyName: r.propertyName,
+    categoryName: r.categoryName,
+    categoryKey: r.categoryKey,
+    itemName: r.itemName,
+    issue: r.comment || "Flagged during checks",
+    severity: effectiveSeverity(r) ?? ("LOW" as Severity),
+    entryDate: r.entryDate,
+    ageDays: Math.max(
+      0,
+      Math.round((today.getTime() - new Date(`${r.entryDate}T00:00:00`).getTime()) / 86_400_000),
+    ),
+    evidenceCount: r.evidenceCount,
+    workflowStatus: r.workflowStatus,
+  }));
+
+  return opts.limit ? defects.slice(0, opts.limit) : defects;
+}
+
+/** Open (defect) issue counts per property for a reporting week. */
+export async function openIssueCounts(
+  weekStart: string,
+  statuses: VisibleStatuses,
+): Promise<Map<string, number>> {
+  const items = await attentionFeed(weekStart, statuses);
+  const map = new Map<string, number>();
+  for (const i of items) map.set(i.propertyId, (map.get(i.propertyId) ?? 0) + 1);
+  return map;
+}
+
+/** Most recent publication timestamp across the portfolio (or one property). */
+export async function lastPublishedAt(propertyId?: string): Promise<Date | null> {
+  const [report] = await db
+    .select({ at: weeklyReports.publishedAt })
+    .from(weeklyReports)
+    .where(
+      and(
+        eq(weeklyReports.workflowStatus, "PUBLISHED"),
+        ...(propertyId ? [eq(weeklyReports.propertyId, propertyId)] : []),
+      ),
+    )
+    .orderBy(desc(weeklyReports.publishedAt))
+    .limit(1);
+  const [entry] = await db
+    .select({ at: checklistEntries.publishedAt })
+    .from(checklistEntries)
+    .where(
+      and(
+        eq(checklistEntries.workflowStatus, "PUBLISHED"),
+        ...(propertyId ? [eq(checklistEntries.propertyId, propertyId)] : []),
+      ),
+    )
+    .orderBy(desc(checklistEntries.publishedAt))
+    .limit(1);
+  const candidates = [report?.at, entry?.at].filter((d): d is Date => Boolean(d));
+  if (candidates.length === 0) return null;
+  return candidates.sort((a, b) => b.getTime() - a.getTime())[0]!;
+}
+
+/** Weekly task-completion series for KPI sparklines (oldest → newest). */
+export async function taskTrend(
+  weekStart: string,
+  statuses: VisibleStatuses,
+  weeks = 6,
+  propertyId?: string,
+): Promise<Array<{ week: string; completed: number; inProcess: number }>> {
+  const first = addDays(weekStart, -7 * (weeks - 1));
+  const rows = await db
+    .select({
+      week: weeklyReports.weekStart,
+      status: weeklyTasks.status,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(weeklyTasks)
+    .innerJoin(weeklyReports, eq(weeklyReports.id, weeklyTasks.weeklyReportId))
+    .where(
+      and(
+        inArray(weeklyReports.workflowStatus, statuses),
+        gte(weeklyReports.weekStart, first),
+        lte(weeklyReports.weekStart, weekStart),
+        ...(propertyId ? [eq(weeklyReports.propertyId, propertyId)] : []),
+      ),
+    )
+    .groupBy(weeklyReports.weekStart, weeklyTasks.status);
+
+  const byWeek = new Map<string, { completed: number; inProcess: number }>();
+  for (const r of rows) {
+    const cur = byWeek.get(r.week) ?? { completed: 0, inProcess: 0 };
+    if (r.status === "COMPLETED") cur.completed += r.count;
+    else cur.inProcess += r.count;
+    byWeek.set(r.week, cur);
+  }
+  return Array.from({ length: weeks }, (_, i) => {
+    const week = addDays(first, i * 7);
+    const v = byWeek.get(week) ?? { completed: 0, inProcess: 0 };
+    return { week, ...v };
+  });
 }
 
 /** Task rows for the property task table (published/preview weekly tasks). */

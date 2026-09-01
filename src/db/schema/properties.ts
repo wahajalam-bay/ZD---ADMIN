@@ -8,7 +8,7 @@ import { boolean, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg
  */
 export const properties = pgTable("properties", {
   id: uuid().primaryKey().defaultRandom(),
-  /** URL-safe unique code, e.g. "neo", "vault". */
+  /** URL-safe unique code, e.g. "opal", "aurum". */
   code: text().notNull().unique(),
   name: text().notNull(),
   location: text(),

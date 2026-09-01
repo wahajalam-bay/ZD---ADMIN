@@ -1,184 +1,209 @@
 import type { PropOneWidgetData } from "@/server/services/propone-service";
-import { statusTone } from "@/lib/propone-metrics";
-import type { PropOneWidgetView } from "./propone-widgets";
+import type { PropOneTrends } from "@/server/services/propone-service";
+import type { PropOneDomainView } from "./propone-section";
 import { formatNumber } from "@/lib/utils";
+import { statusTone } from "@/lib/propone-metrics";
 
-const TEAL = "#0d7a3f";
-const AMBER = "#d97706";
-const RED = "#dc2626";
+const C = {
+  c1: "var(--c1)",
+  c2: "var(--c2)",
+  c3: "var(--c3)",
+  c4: "var(--c4)",
+  red: "var(--red)",
+  muted: "var(--muted)",
+};
 
-const TONE_COLOR = { ok: TEAL, warn: AMBER, bad: RED } as const;
+const TONE_COLOR = { ok: C.c1, warn: C.c3, bad: C.red } as const;
 
 function fmtDateTime(d: Date | null): string {
   if (!d) return "—";
-  return d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-/** Maps server-side PropOne widget data into a serializable client view. */
-export function buildPropOneWidgetViews(widgets: PropOneWidgetData[]): PropOneWidgetView[] {
-  return widgets.map((w): PropOneWidgetView => {
+/**
+ * Maps server PropOne data into the tabbed section's view model.
+ * Chart choice follows §3.10: composition for status mixes, line only when
+ * there is enough history — never incomparable scopes on one axis.
+ */
+export function buildPropOneDomains(
+  widgets: PropOneWidgetData[],
+  trends: PropOneTrends,
+): PropOneDomainView[] {
+  const views: PropOneDomainView[] = [];
+
+  for (const w of widgets) {
     if (w.workOrders) {
       const m = w.workOrders;
-      return {
-        domain: w.domain,
-        label: w.label,
+      const composition = [
+        { name: "Completed", value: m.completed, color: C.c1 },
+        { name: "Rejected", value: m.rejected, color: C.red },
+        { name: "Pending Procurement", value: m.pendingProcurement, color: C.c3 },
+        { name: "In Progress / Other", value: m.other, color: C.c2 },
+      ].filter((s) => s.value > 0);
+      views.push({
+        key: "work-orders",
+        label: "Work Orders",
         kpis: [
-          { label: "Work Orders (All)", value: formatNumber(m.all) },
-          { label: "Completed", value: formatNumber(m.completed), tone: "ok" },
-          { label: "Rejected", value: formatNumber(m.rejected), tone: "bad" },
-          ...(m.pendingProcurement > 0
-            ? [{ label: "Pending Procurement", value: formatNumber(m.pendingProcurement), tone: "warn" as const }]
-            : []),
+          { label: "Total", value: formatNumber(m.all) },
+          { label: "Completed", value: formatNumber(m.completed), tone: "green" },
           ...(m.other > 0
-            ? [{ label: "In Progress / Other", value: formatNumber(m.other), tone: "warn" as const }]
+            ? [{ label: "In Progress", value: formatNumber(m.other), tone: "blue" as const }]
             : []),
+          ...(m.pendingProcurement > 0
+            ? [
+                {
+                  label: "Pending Procurement",
+                  value: formatNumber(m.pendingProcurement),
+                  tone: "orange" as const,
+                },
+              ]
+            : []),
+          { label: "Rejected", value: formatNumber(m.rejected), tone: "red" },
         ],
-        chart: {
-          kind: "donut",
-          slices: [
-            { name: "Completed", value: m.completed, color: TEAL },
-            { name: "Rejected", value: m.rejected, color: RED },
-            { name: "Pending Procurement", value: m.pendingProcurement, color: AMBER },
-            { name: "In Progress / Other", value: m.other, color: "#1d6cb0" },
-          ].filter((s) => s.value > 0),
-          center: String(m.all),
-          centerLabel: "Total",
-        },
-        detail: {
-          title: `${w.label} — latest records`,
-          note: `${m.latest.length} most recent of ${m.all} imported work orders.`,
-          columns: ["Issue", "Unit", "Added By", "Date", "Charges", "Assignee", "Status"],
+        composition,
+        compositionTotal: m.all,
+        // Monthly history is only meaningful with ≥4 periods (audit R3).
+        trend:
+          trends.workOrdersMonthly.length >= 4
+            ? {
+                label: "Work orders",
+                data: trends.workOrdersMonthly.map((m2) => ({ week: m2.month, count: m2.total })),
+              }
+            : undefined,
+        table: {
+          columns: ["Issue", "Unit", "Date", "Assignee", "Status"],
           rows: m.latest.map((r) => [
             r.issue,
-            r.unit,
-            r.addedBy,
+            r.unit || "—",
             r.orderDate ?? "—",
-            r.serviceCharges || "—",
             r.assignee || "—",
             r.status,
           ]),
-          statusColumn: 6,
+          statusColumn: 4,
         },
-      };
+        note:
+          trends.workOrdersMonthly.length < 4
+            ? "A monthly trend appears once at least four months of work-order history have been synced."
+            : undefined,
+      });
     }
+
     if (w.visits) {
       const m = w.visits;
-      return {
-        domain: w.domain,
-        label: w.label,
+      views.push({
+        key: "visits",
+        label: "Visits",
+        // Today / This week / All-time are incomparable scopes — KPI values
+        // only, with a real weekly trend beneath (audit R2).
         kpis: [
           { label: "Today", value: formatNumber(m.today) },
-          { label: "This Week", value: formatNumber(m.thisWeek) },
-          { label: "All-time", value: formatNumber(m.allTime) },
+          { label: "This Week", value: formatNumber(m.thisWeek), tone: "green" },
+          { label: "All-time", value: formatNumber(m.allTime), tone: "neutral" },
         ],
-        chart: {
-          kind: "bar",
-          data: [
-            { name: "Today", value: m.today },
-            { name: "This Week", value: m.thisWeek },
-            { name: "All-time", value: m.allTime },
-          ],
-        },
-        detail: {
-          title: `${w.label} — latest visits`,
-          note: `${m.latest.length} most recent of ${m.allTime} imported visits.`,
-          columns: ["Visitor", "Unit", "Resident", "Arrival", "Departure", "Status"],
+        trend: { label: "Visits", data: trends.visitsWeekly },
+        table: {
+          columns: ["Visitor", "Unit", "Arrival", "Departure", "Status"],
           rows: m.latest.map((r) => [
             r.visitorName,
-            r.unit,
-            r.residentName,
+            r.unit || "—",
             fmtDateTime(r.arrivalAt),
             fmtDateTime(r.departureAt),
             r.status,
           ]),
-          statusColumn: 5,
+          statusColumn: 4,
         },
-      };
+      });
     }
+
     if (w.visitors) {
       const m = w.visitors;
-      return {
-        domain: w.domain,
-        label: w.label,
+      views.push({
+        key: "visitors",
+        label: "Visitors",
         kpis: [{ label: "Visitors (period)", value: formatNumber(m.period) }],
-        detail: {
-          title: `${w.label} — latest entries`,
-          columns: ["Visitor", "Unit", "Resident", "Arrival", "Status"],
-          rows: m.latest.map((r) => [
-            r.visitorName,
-            r.unit,
-            r.residentName,
-            fmtDateTime(r.arrivalAt),
-            r.status,
-          ]),
-          statusColumn: 4,
+        trend: { label: "Visitors", data: trends.visitsWeekly },
+        table: {
+          columns: ["Visitor", "Unit", "Arrival", "Status"],
+          rows: m.latest.map((r) => [r.visitorName, r.unit || "—", fmtDateTime(r.arrivalAt), r.status]),
+          statusColumn: 3,
         },
-      };
+      });
     }
+
     if (w.bookings) {
       const m = w.bookings;
-      // Status vocabulary differs per source (reference CSV: Attended/Pre-booked;
-      // FMS warehouse: Confirmed/Pending/Cancelled/…) — present the real counts.
-      const topStatuses = Object.entries(m.byStatus).sort((a, b) => b[1] - a[1]);
-      return {
-        domain: w.domain,
-        label: w.label,
+      const entries = Object.entries(m.byStatus).sort((a, b) => b[1] - a[1]);
+      const isCinema = w.domain === "CINEMA_BOOKINGS";
+      views.push({
+        key: isCinema ? "cinema" : "amenities",
+        label: isCinema ? "Cinema" : "Amenities",
         kpis: [
           { label: "Bookings", value: formatNumber(m.total) },
-          ...topStatuses.slice(0, 5).map(([status, count]) => ({
+          ...entries.slice(0, 4).map(([status, count]) => ({
             label: status,
             value: formatNumber(count),
-            tone: statusTone(status),
+            tone: (statusTone(status) === "ok"
+              ? "green"
+              : statusTone(status) === "bad"
+                ? "red"
+                : "orange") as "green" | "red" | "orange",
           })),
         ],
-        chart: {
-          kind: "donut",
-          slices: topStatuses.map(([status, count], i) => ({
-            name: status,
-            value: count,
-            color: i < 4 ? TONE_COLOR[statusTone(status)] : "#94a3b8",
-          })),
-          center: String(m.total),
-          centerLabel: "Total",
+        // Donut/composition only for ≤5 meaningful categories (§3.10).
+        composition:
+          entries.length <= 5
+            ? entries.map(([status, count]) => ({
+                name: status,
+                value: count,
+                color: TONE_COLOR[statusTone(status)],
+              }))
+            : undefined,
+        compositionTotal: m.total,
+        trend: { label: "Bookings", data: trends.bookingsWeekly },
+        table: {
+          columns: ["Amenity", "Booked", "Status"],
+          rows: m.latest.map((r) => [r.amenity, fmtDateTime(r.bookingAt), r.status]),
+          statusColumn: 2,
         },
-        detail: {
-          title: `${w.label} — latest bookings`,
-          columns: ["Amenity", "Unit", "Booked By", "When", "Status"],
-          rows: m.latest.map((r) => [r.amenity, r.unit, r.bookedBy, fmtDateTime(r.bookingAt), r.status]),
-          statusColumn: 4,
-        },
-      };
+      });
     }
+
     if (w.stickers) {
       const m = w.stickers;
-      return {
-        domain: w.domain,
-        label: w.label,
+      views.push({
+        key: "stickers",
+        label: "Vehicle Stickers",
         kpis: [
           { label: "Issued (period)", value: formatNumber(m.issuedPeriod) },
           { label: "Issued (all-time)", value: formatNumber(m.issuedAllTime) },
         ],
-        detail: {
-          title: `${w.label} — latest stickers`,
+        table: {
           columns: ["Unit", "Owner", "Vehicle", "Type", "Issued"],
           rows: m.latest.map((r) => [r.unit, r.ownerName, r.vehicle, r.stickerType, r.issuedDate ?? "—"]),
         },
-      };
+      });
     }
+
     if (w.announcements) {
       const m = w.announcements;
-      return {
-        domain: w.domain,
-        label: w.label,
+      views.push({
+        key: "announcements",
+        label: "Announcements",
         kpis: [
           { label: "Sent (all-time)", value: formatNumber(m.total) },
           { label: "Sent (period)", value: formatNumber(m.sentPeriod) },
         ],
         note: m.latest
           ? `Latest: “${m.latest.title}” — sent ${fmtDateTime(m.latest.sentAt)}${m.latest.audience ? ` to ${m.latest.audience}` : ""}.`
-          : "No announcements imported yet.",
-      };
+          : "No announcements have been synced for this property.",
+      });
     }
-    return { domain: w.domain, label: w.label, kpis: [] };
-  });
+  }
+
+  return views;
 }

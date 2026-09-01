@@ -372,6 +372,28 @@ export async function publishWeekForProperty(
   });
 }
 
+/** Queue counts per workflow state — drives the review segmented control. */
+export async function reviewQueueCounts(): Promise<Record<WorkflowStatus, number>> {
+  const entryRows = await db
+    .select({ status: checklistEntries.workflowStatus, c: count() })
+    .from(checklistEntries)
+    .groupBy(checklistEntries.workflowStatus);
+  const reportRows = await db
+    .select({ status: weeklyReports.workflowStatus, c: count() })
+    .from(weeklyReports)
+    .groupBy(weeklyReports.workflowStatus);
+
+  const totals: Record<WorkflowStatus, number> = {
+    DRAFT: 0,
+    SUBMITTED: 0,
+    RETURNED: 0,
+    APPROVED: 0,
+    PUBLISHED: 0,
+  };
+  for (const r of [...entryRows, ...reportRows]) totals[r.status] += r.c;
+  return totals;
+}
+
 /** Counts of pending review items (for nav badges). */
 export async function countPendingReview(): Promise<number> {
   const [a] = await db

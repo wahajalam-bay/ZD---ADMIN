@@ -4,11 +4,14 @@ import { requirePageUser } from "@/server/auth/session";
 import { getPropertyByCode } from "@/server/permissions";
 import { canReview } from "@/lib/roles";
 import {
-  bottlenecksForProperty,
+  attentionFeed,
   complianceForWeek,
+  lastPublishedAt,
+  bottlenecksForProperty,
   propertyWeekStats,
   PREVIEW,
   PUBLISHED_ONLY,
+  taskTrend,
   tasksForProperty,
 } from "@/server/services/metrics-service";
 import {
@@ -20,19 +23,24 @@ import {
   propOneTrendsForProperty,
   propOneWidgetsForProperty,
 } from "@/server/services/propone-service";
-import { PropOneTrendsSection } from "@/features/command-center/propone-trends";
 import { weeklyPhotosForWeek } from "@/server/services/media-service";
-import { buildPropOneWidgetViews } from "@/features/command-center/propone-mapper";
-import { PropOneWidgets } from "@/features/command-center/propone-widgets";
+import { buildPropOneDomains } from "@/features/command-center/propone-mapper";
+import { PropOneSection } from "@/features/command-center/propone-section";
+import { AttentionFeed } from "@/features/command-center/attention-feed";
 import { BottleneckTable } from "@/features/command-center/bottleneck-table";
-import { DonutStat, CHART_COLORS } from "@/features/command-center/charts";
 import { AlbumGallery } from "@/features/command-center/album-gallery";
-import { WeekSelector } from "@/components/shell/week-selector";
-import { Card } from "@/components/ui/card";
-import { TaskStatusBadge, TrackingBadge, Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/shell/page-header";
+import { ReportingControls, PreviewNotice } from "@/components/shell/reporting-controls";
+import { ModeSwitcher } from "@/components/theme/mode-switcher";
+import { SectionHeader } from "@/components/ui/section-header";
+import { Card, ChartCard } from "@/components/ui/card";
+import { KpiCard, KpiStrip } from "@/components/ui/kpi-card";
+import { ProgressRing } from "@/components/ui/progress-ring";
+import { TrackingBadge, TaskStatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { taskCompletionPct } from "@/lib/metrics";
-import { formatEta } from "@/lib/utils";
+import { formatDateTime, formatEta } from "@/lib/utils";
+import { addDays, weekRangeLabel } from "@/lib/week";
 import { mediaUrl } from "@/lib/media-url";
 
 export const dynamic = "force-dynamic";
@@ -65,168 +73,226 @@ export default async function PropertyDashboardPage({
   const statuses = previewOn ? PREVIEW : PUBLISHED_ONLY;
 
   const week = await resolveSelectedWeek(sp.week);
-  const [weeks, state, statsMap, complianceMap, tasks, bottlenecks, widgets, photos, trends] =
-    await Promise.all([
-      listKnownWeeks(),
-      weekDataState(week, property.id),
-      propertyWeekStats(week, statuses, [property.id]),
-      complianceForWeek(week, statuses, [property.id]),
-      tasksForProperty(property.id, week, statuses),
-      bottlenecksForProperty(property.id, week, statuses),
-      propOneWidgetsForProperty(property.id, week),
-      weeklyPhotosForWeek(week, statuses, property.id),
-      propOneTrendsForProperty(property.id),
-    ]);
+  const prevWeek = addDays(week, -7);
+
+  const [
+    weeks,
+    state,
+    statsMap,
+    prevStatsMap,
+    complianceMap,
+    tasks,
+    bottlenecks,
+    attention,
+    widgets,
+    trends,
+    photos,
+    publishedAt,
+    trend,
+  ] = await Promise.all([
+    listKnownWeeks(),
+    weekDataState(week, property.id),
+    propertyWeekStats(week, statuses, [property.id]),
+    propertyWeekStats(prevWeek, statuses, [property.id]),
+    complianceForWeek(week, statuses, [property.id]),
+    tasksForProperty(property.id, week, statuses),
+    bottlenecksForProperty(property.id, week, statuses),
+    attentionFeed(week, statuses, { propertyIds: [property.id] }),
+    propOneWidgetsForProperty(property.id, week),
+    propOneTrendsForProperty(property.id),
+    weeklyPhotosForWeek(week, statuses, property.id),
+    lastPublishedAt(property.id),
+    taskTrend(week, statuses, 6, property.id),
+  ]);
 
   const stats = statsMap.get(property.id) ?? null;
+  const prevStats = prevStatsMap.get(property.id) ?? null;
   const compliance = complianceMap.get(property.id) ?? { total: 0, clean: 0, flagged: 0, pct: null };
   const completionPct = stats ? taskCompletionPct(stats.tasks) : null;
-  const widgetViews = buildPropOneWidgetViews(widgets);
+  const domains = buildPropOneDomains(widgets, trends);
+
+  const evidenceById = new Map(bottlenecks.map((b) => [b.responseId, b.evidence]));
+  const attentionRows = attention.map((a) => ({
+    responseId: a.responseId,
+    propertyCode: property.code,
+    propertyName: property.name,
+    categoryName: a.categoryName,
+    itemName: a.itemName,
+    issue: a.issue,
+    severity: a.severity,
+    entryDate: a.entryDate,
+    ageDays: a.ageDays,
+    workflowStatus: a.workflowStatus,
+    evidence: (evidenceById.get(a.responseId) ?? []).map((e) => ({
+      id: e.id,
+      url: mediaUrl(e.storageKey),
+      thumbUrl: mediaUrl(e.thumbnailKey),
+      caption: e.caption,
+    })),
+  }));
+
+  const meta = [property.location, property.propertyType, property.areaLabel, property.developmentStatus]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div data-testid={`property-dashboard-${property.code}`}>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="mb-1 text-[11.5px] font-semibold tracking-wider text-muted uppercase">
-            Admin · Weekly Property Update
-          </div>
-          <h2 className="text-[22px] font-bold">{property.name}</h2>
-          <div className="mt-2">
-            <WeekSelector
+      {/* 1 — Sticky property header */}
+      <PageHeader
+        breadcrumb={[{ label: "Portfolio", href: "/command-center" }, { label: property.name }]}
+        title={property.name}
+        meta={
+          <>
+            {meta || "Master data pending — editable at Admin → Properties"} · {weekRangeLabel(week)}
+            {publishedAt ? ` · last published ${formatDateTime(publishedAt)}` : ""}
+          </>
+        }
+        controls={
+          <>
+            <TrackingBadge status={stats?.trackingStatus ?? null} />
+            <ReportingControls
               weeks={weeks}
               selected={week}
               dataState={previewOn && state === "PREVIEW" ? "PREVIEW" : state}
               canPreview={previewAllowed}
               previewOn={previewOn}
             />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Badge className="bg-panel border border-line text-muted">📷 Site Images</Badge>
-          <Badge className="bg-panel border border-line text-muted/60" title="No video submitted — video support is modeled but not yet enabled">
-            🎥 Site Videos
-          </Badge>
-          <Badge className="bg-panel border border-line text-muted/60" title="No live camera feed configured">
-            📡 Live Camera
-          </Badge>
-        </div>
-      </div>
-
-      <Card className="mb-2 px-5 py-4">
-        <div className="text-[15px] font-bold">
-          {[property.location, property.propertyType].filter(Boolean).join(" · ") ||
-            "Property master data pending — editable at Admin → Properties"}
-        </div>
-        <div className="mt-2.5 flex flex-wrap gap-2">
-          {property.areaLabel ? (
-            <Badge className="bg-accent-light text-accent-dark">{property.areaLabel}</Badge>
-          ) : null}
-          {property.developmentStatus ? (
-            <Badge className="bg-accent-light text-accent-dark">{property.developmentStatus}</Badge>
-          ) : null}
-          <Badge className="bg-accent-light text-accent-dark">
-            {stats?.tasks.completed ?? 0} completed this week
-          </Badge>
-          <Badge className="bg-accent-light text-accent-dark">
-            {stats?.tasks.inProcess ?? 0} in process
-          </Badge>
-          <Badge className="bg-accent-light text-accent-dark">{photos.length} photos</Badge>
-          <TrackingBadge status={stats?.trackingStatus ?? null} />
-        </div>
-        {stats?.summary ? (
-          <p className="mt-3 border-t border-line pt-2.5 text-[13px] leading-relaxed">{stats.summary}</p>
-        ) : null}
-      </Card>
-
-      <div className="secbar">
-        <h3>PropOne Dashboard</h3>
-        <div className="line" />
-      </div>
-      <PropOneWidgets widgets={widgetViews} />
-      <PropOneTrendsSection
-        visitsWeekly={trends.visitsWeekly}
-        bookingsWeekly={trends.bookingsWeekly}
-        workOrdersMonthly={trends.workOrdersMonthly}
+            <ModeSwitcher showPresentation />
+          </>
+        }
       />
 
-      <div className="secbar">
-        <h3>Status Overview</h3>
-        <div className="line" />
-      </div>
+      {previewOn ? <PreviewNotice weekStart={week} /> : null}
+
+      {/* 2 — Weekly management summary */}
+      <Card className="mb-6 flex flex-wrap items-start gap-4 p-4">
+        <div className="flex min-w-[132px] flex-col gap-1.5">
+          <span className="t-label text-muted">Weekly status</span>
+          <TrackingBadge status={stats?.trackingStatus ?? null} />
+        </div>
+        <div className="min-w-[240px] flex-1 border-s border-line ps-4">
+          <span className="t-label text-muted">Management summary</span>
+          <p className="mt-1 text-[13.5px] leading-relaxed text-ink">
+            {stats?.summary?.trim()
+              ? stats.summary
+              : `No ${previewOn ? "approved" : "published"} weekly summary has been submitted for ${property.name} in ${weekRangeLabel(week)}.`}
+          </p>
+        </div>
+      </Card>
+
+      {/* 3 — Core operational KPIs */}
+      <KpiStrip className="mb-7">
+        <KpiCard
+          label="Completed"
+          value={stats?.tasks.completed ?? 0}
+          icon="check"
+          tone="green"
+          delta={{ value: (stats?.tasks.completed ?? 0) - (prevStats?.tasks.completed ?? 0), label: "vs last week" }}
+          sparkline={trend.map((t) => t.completed)}
+        />
+        <KpiCard
+          label="In Process"
+          value={stats?.tasks.inProcess ?? 0}
+          icon="loader"
+          tone="orange"
+          delta={{
+            value: (stats?.tasks.inProcess ?? 0) - (prevStats?.tasks.inProcess ?? 0),
+            label: "vs last week",
+            invert: true,
+          }}
+          sparkline={trend.map((t) => t.inProcess)}
+        />
+        <KpiCard
+          label="Checklist Compliance"
+          value={compliance.pct === null ? "—" : `${compliance.pct}%`}
+          icon="shield"
+          tone={compliance.pct !== null && compliance.pct < 70 ? "orange" : "green"}
+          progress={compliance.pct}
+          hint={`${compliance.clean} clean of ${compliance.total} entries`}
+        />
+        <KpiCard
+          label="Open Issues"
+          value={attentionRows.length}
+          icon="alert"
+          tone={attentionRows.length > 0 ? "red" : "green"}
+        />
+        <KpiCard label="Photos Logged" value={photos.length} icon="camera" tone="blue" />
+      </KpiStrip>
+
+      {/* 4 — Attention required */}
+      <SectionHeader
+        title="Attention required"
+        icon="warning"
+        description="Unresolved checklist issues for this reporting week — most serious first."
+      />
+      <AttentionFeed
+        rows={attentionRows}
+        showProperty={false}
+        limit={5}
+        emptyTitle={`No open checklist issues for ${property.name} this week`}
+        emptyDetail="Flagged checklist points and their evidence appear here as soon as they are published."
+      />
+
+      {/* 5 — Task completion + checklist compliance */}
+      <SectionHeader className="mt-8" title="Weekly performance" icon="clipboard" />
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-5">
-          <h4 className="mb-3 text-[12px] font-bold tracking-wide text-muted uppercase">
-            Task Completion — {property.name}
-          </h4>
+        <ChartCard title="Task completion" question="How much of this week's work is finished?">
           {stats ? (
-            <DonutStat
-              ariaLabel={`Task completion for ${property.name}`}
-              slices={[
-                { name: "Completed", value: stats.tasks.completed, color: CHART_COLORS.TEAL },
-                { name: "In Process", value: stats.tasks.inProcess, color: CHART_COLORS.AMBER },
-              ]}
-              legendExtra={[{ name: "Photos logged", value: photos.length, color: CHART_COLORS.BLUE }]}
-              centerValue={completionPct === null ? "—" : `${completionPct}%`}
-              centerLabel="Done"
-            />
+            <div className="flex flex-wrap items-center gap-5">
+              <ProgressRing
+                value={completionPct}
+                caption="Done"
+                ariaLabel={`Task completion ${completionPct ?? 0} percent`}
+              />
+              <ul className="flex min-w-[130px] flex-col gap-2 text-[12.5px]">
+                <Legend color="var(--c1)" label="Completed" value={stats.tasks.completed} />
+                <Legend color="var(--c3)" label="In Process" value={stats.tasks.inProcess} />
+                <Legend color="var(--c2)" label="Photos" value={photos.length} />
+              </ul>
+            </div>
           ) : (
             <EmptyState
-              title={`No ${previewOn ? "approved or published" : "published"} weekly report for this week`}
-              detail="Data appears here once the site's weekly report is approved and published."
+              compact
+              title={`No ${previewOn ? "approved" : "published"} weekly report for this week`}
+              detail="Task metrics appear once the site's weekly report is approved and published."
             />
           )}
-        </Card>
-        <Card className="p-5">
-          <h4 className="mb-3 text-[12px] font-bold tracking-wide text-muted uppercase">
-            Checklist Compliance — {property.name}
-          </h4>
+        </ChartCard>
+        <ChartCard title="Checklist compliance" question="How clean were this week's checklists?">
           {compliance.total > 0 ? (
-            <DonutStat
-              ariaLabel={`Checklist compliance for ${property.name}`}
-              slices={[
-                { name: "Clean", value: compliance.clean, color: CHART_COLORS.TEAL },
-                { name: "Flagged", value: compliance.flagged, color: CHART_COLORS.RED },
-              ]}
-              legendExtra={[{ name: "Total entries", value: compliance.total, color: CHART_COLORS.GREY }]}
-              centerValue={compliance.pct === null ? "—" : `${compliance.pct}%`}
-              centerLabel="Clean"
-            />
+            <div className="flex flex-wrap items-center gap-5">
+              <ProgressRing
+                value={compliance.pct}
+                caption="Clean"
+                ariaLabel={`Checklist compliance ${compliance.pct ?? 0} percent`}
+              />
+              <ul className="flex min-w-[130px] flex-col gap-2 text-[12.5px]">
+                <Legend color="var(--c1)" label="Clean" value={compliance.clean} />
+                <Legend color="var(--red)" label="Flagged" value={compliance.flagged} />
+                <Legend color="var(--neutral-track)" label="Total entries" value={compliance.total} />
+              </ul>
+            </div>
           ) : (
             <EmptyState
+              compact
               title="No published checklist entries this week"
               detail="Compliance is computed from published daily checklist entries."
             />
           )}
-        </Card>
+        </ChartCard>
       </div>
 
-      <div className="secbar">
-        <h3>Checklist Bottlenecks</h3>
-        <div className="line" />
-      </div>
-      <Card className="overflow-hidden">
-        <BottleneckTable
-          rows={bottlenecks.map((b) => ({
-            responseId: b.responseId,
-            categoryName: b.categoryName,
-            itemName: b.itemName,
-            issue: b.issue,
-            severity: b.severity,
-            entryDate: b.entryDate,
-            evidence: b.evidence.map((e) => ({
-              id: e.id,
-              url: mediaUrl(e.storageKey),
-              thumbUrl: mediaUrl(e.thumbnailKey),
-              caption: e.caption,
-            })),
-          }))}
-        />
-      </Card>
+      {/* 6 — PropOne */}
+      <SectionHeader
+        className="mt-8"
+        title="PropOne"
+        icon="plug"
+        description="Live operational data synced from the PropOne warehouse."
+      />
+      <PropOneSection domains={domains} weekLabel={weekRangeLabel(week)} />
 
-      <div className="secbar">
-        <h3>Updates — Task Status</h3>
-        <div className="line" />
-      </div>
+      {/* 7 — Weekly tasks */}
+      <SectionHeader className="mt-8" title="Weekly tasks" icon="clipboard" />
       <Card className="overflow-hidden">
         {tasks.length > 0 ? (
           <div className="overflow-x-auto">
@@ -235,35 +301,62 @@ export default async function PropertyDashboardPage({
                 <tr>
                   <th style={{ width: 44 }}>#</th>
                   <th>Task</th>
-                  <th style={{ width: 120 }}>Status</th>
-                  <th style={{ width: 130 }}>ETA / Completion</th>
+                  <th style={{ width: 130 }}>Status</th>
+                  <th style={{ width: 150 }}>ETA / Completion</th>
                 </tr>
               </thead>
               <tbody>
                 {tasks.map((t, i) => (
                   <tr key={t.id}>
-                    <td className="font-mono text-xs text-muted">{String(i + 1).padStart(2, "0")}</td>
-                    <td>{t.task}</td>
+                    <td className="font-mono text-[11px] text-muted">{String(i + 1).padStart(2, "0")}</td>
+                    <td className="font-medium">{t.task}</td>
                     <td>
-                      <TaskStatusBadge status={t.status} />
+                      <TaskStatusBadge status={t.status} size="sm" />
                     </td>
-                    <td className="font-mono text-xs text-muted">{formatEta(t.etaDate)}</td>
+                    <td className="font-mono text-[11.5px] text-muted">{formatEta(t.etaDate)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <div className="px-5 py-8 text-center text-[13px] text-muted">
-            No {previewOn ? "approved or published" : "published"} tasks for this reporting week.
-          </div>
+          <EmptyState
+            compact
+            title={`No ${previewOn ? "approved" : "published"} tasks for this reporting week`}
+            detail={`Weekly tasks submitted by the ${property.name} site team appear here once published.`}
+          />
         )}
       </Card>
 
-      <div className="secbar">
-        <h3>Progress Media</h3>
-        <div className="line" />
-      </div>
+      {/* 8 — Checklist bottlenecks (full detail table) */}
+      <SectionHeader className="mt-8" title="Checklist bottlenecks" icon="alert" />
+      <Card className="overflow-hidden">
+        <BottleneckTable
+          propertyName={property.name}
+          rows={bottlenecks.map((b) => {
+            const item = attention.find((a) => a.responseId === b.responseId);
+            return {
+              responseId: b.responseId,
+              categoryName: b.categoryName,
+              itemName: b.itemName,
+              issue: b.issue,
+              severity: b.severity,
+              entryDate: b.entryDate,
+              ageDays: item?.ageDays ?? 0,
+              workflowStatus: item?.workflowStatus,
+              evidence: b.evidence.map((e) => ({
+                id: e.id,
+                url: mediaUrl(e.storageKey),
+                thumbUrl: mediaUrl(e.thumbnailKey),
+                caption: e.caption,
+              })),
+            };
+          })}
+        />
+      </Card>
+
+      {/* 9 — Progress media */}
+      <SectionHeader className="mt-8" title="Progress media" icon="images" />
       <AlbumGallery
         propertyName={property.name}
         photos={photos.map((p) => ({
@@ -273,8 +366,18 @@ export default async function PropertyDashboardPage({
           caption: p.caption,
           context: p.context,
         }))}
-        emptyText={`No ${previewOn ? "approved or published" : "published"} progress photos for this week.`}
+        emptyText={`No ${previewOn ? "approved or published" : "published"} progress photos for ${property.name} this week.`}
       />
     </div>
+  );
+}
+
+function Legend({ color, label, value }: { color: string; label: string; value: number }) {
+  return (
+    <li className="flex items-center gap-2">
+      <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: color }} aria-hidden />
+      <span className="flex-1 text-ink">{label}</span>
+      <b className="font-mono">{value}</b>
+    </li>
   );
 }

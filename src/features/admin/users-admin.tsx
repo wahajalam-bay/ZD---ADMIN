@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { KeyRound, Pencil, Plus, ShieldOff, ShieldCheck } from "lucide-react";
 import {
   createUserAction,
   resetPasswordAction,
@@ -10,7 +10,8 @@ import {
   updateUserAction,
 } from "@/server/actions/admin-actions";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/status-badge";
+import { ActionMenu } from "@/components/ui/menu";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Select } from "@/components/ui/field";
@@ -137,7 +138,7 @@ export function UsersAdmin({ users, properties }: { users: UserRow[]; properties
                 <th>Role</th>
                 <th>Property</th>
                 <th>Status</th>
-                <th style={{ width: 240 }}>Actions</th>
+                <th style={{ width: 90 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -149,35 +150,34 @@ export function UsersAdmin({ users, properties }: { users: UserRow[]; properties
                   <td>{u.propertyName ?? "—"}</td>
                   <td>
                     {u.banned ? (
-                      <Badge className="bg-bad-bg text-bad">Disabled</Badge>
+                      <Badge tone="red" icon={ShieldOff}>Disabled</Badge>
                     ) : (
-                      <Badge className="bg-accent-light text-accent-dark">Active</Badge>
+                      <Badge tone="green" icon={ShieldCheck}>Active</Badge>
                     )}
                   </td>
                   <td>
-                    <div className="flex gap-1.5">
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setEditUser(u);
-                          setERole((u.role as Role) ?? "SITE_USER");
-                          setEProperty(u.propertyId ?? properties[0]?.id ?? "");
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button size="sm" onClick={() => setResetUser(u)}>
-                        Reset password
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={u.banned ? "default" : "danger"}
-                        onClick={() => toggleDisabled(u)}
-                        data-testid={`toggle-disabled-${u.email}`}
-                      >
-                        {u.banned ? "Reactivate" : "Disable"}
-                      </Button>
-                    </div>
+                    <ActionMenu
+                      testId={`user-actions-${u.email}`}
+                      label={`Actions for ${u.email}`}
+                      items={[
+                        {
+                          label: "Edit role & property",
+                          icon: Pencil,
+                          onSelect: () => {
+                            setEditUser(u);
+                            setERole((u.role as Role) ?? "SITE_USER");
+                            setEProperty(u.propertyId ?? properties[0]?.id ?? "");
+                          },
+                        },
+                        { label: "Reset password", icon: KeyRound, onSelect: () => setResetUser(u) },
+                        {
+                          label: u.banned ? "Reactivate account" : "Disable account",
+                          icon: u.banned ? ShieldCheck : ShieldOff,
+                          danger: !u.banned,
+                          onSelect: () => toggleDisabled(u),
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
