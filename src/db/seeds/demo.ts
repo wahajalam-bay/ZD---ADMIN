@@ -195,7 +195,7 @@ export async function runDemoSeed() {
         { task: "DEMO — Planter area tiles installation", status: "IN_PROCESS", eta: addDays(thisWeek, 3) },
       ],
       photos: [
-        { label: "Opal lobby cleaning", color: "#0f766e", caption: "DEMO: Main lobby area cleaning" },
+        { label: "Opal lobby cleaning", color: "#08643a", caption: "DEMO: Main lobby area cleaning" },
         { label: "Opal rooftop", color: "#155e75", caption: "DEMO: Rooftop cleaning" },
       ],
     },
@@ -213,9 +213,9 @@ export async function runDemoSeed() {
         { task: "DEMO — ACB breaker replacement", status: "IN_PROCESS", eta: addDays(thisWeek, 9) },
       ],
       photos: [
-        { label: "Opal boundary wall", color: "#0d9488", caption: "DEMO: Boundary area cleaning" },
+        { label: "Opal boundary wall", color: "#0d7a3f", caption: "DEMO: Boundary area cleaning" },
         { label: "Opal gym", color: "#4338ca", caption: "DEMO: Fitness center maintenance" },
-        { label: "Opal pool", color: "#0369a1", caption: "DEMO: Swimming pool skimming" },
+        { label: "Opal pool", color: "#1d6cb0", caption: "DEMO: Swimming pool skimming" },
       ],
     },
     {

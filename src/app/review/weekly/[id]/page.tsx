@@ -47,7 +47,7 @@ export default async function WeeklyReviewPage({ params }: { params: Promise<{ i
             <StatusBadge status={report.workflowStatus} />
             <Link
               href={`/entry/${row.property.code}/weekly?week=${report.weekStart}`}
-              className="rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-bold hover:bg-slate-50"
+              className="rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-bold hover:bg-panel2"
             >
               Open in entry form
             </Link>

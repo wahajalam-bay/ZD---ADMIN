@@ -11,12 +11,23 @@ export default async function LoginPage() {
   // Authoritative session check (a mere cookie is not enough — it may be stale).
   const user = await getSessionUser();
   if (user) redirect("/");
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-bg px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 text-center">
-          <h1 className="text-[17px] font-extrabold tracking-wide">ZAMEEN DEVELOPMENTS</h1>
-          <p className="mt-1 text-xs tracking-wider text-muted uppercase">
+    <main className="relative flex min-h-screen items-center justify-center px-4">
+      {/* Bayut hero backdrop */}
+      <div className="bg-grad-hero absolute inset-x-0 top-0 h-[46vh]" aria-hidden />
+      <div className="relative z-10 w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <span
+            aria-hidden
+            className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-white to-[#d8f0e2] text-lg font-bold text-accent-deep shadow-[0_8px_24px_rgba(0,0,0,0.3),inset_0_0_0_1px_rgba(255,255,255,0.6)]"
+          >
+            ZA
+          </span>
+          <h1 className="mt-4 text-[19px] font-bold tracking-[0.2px] text-white">
+            Zameen Developments
+          </h1>
+          <p className="mt-1 text-[10.5px] font-semibold tracking-[1px] text-white/75 uppercase">
             Admin Properties · Operations &amp; Command Center
           </p>
         </div>

@@ -279,7 +279,7 @@ export function ChecklistEntryForm(props: {
                         <input
                           type="checkbox"
                           aria-label={`${item.name} opening check`}
-                          className="h-5 w-5 cursor-pointer accent-[#0d9488]"
+                          className="h-5 w-5 cursor-pointer accent-[#0d7a3f]"
                           checked={row.op}
                           disabled={disabled}
                           onChange={(e) => updateRow(item.id, { op: e.target.checked })}
@@ -289,7 +289,7 @@ export function ChecklistEntryForm(props: {
                         <input
                           type="checkbox"
                           aria-label={`${item.name} closing check`}
-                          className="h-5 w-5 cursor-pointer accent-[#0d9488]"
+                          className="h-5 w-5 cursor-pointer accent-[#0d7a3f]"
                           checked={row.cl}
                           disabled={disabled}
                           onChange={(e) => updateRow(item.id, { cl: e.target.checked })}

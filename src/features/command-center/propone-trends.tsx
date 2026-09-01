@@ -15,10 +15,10 @@ import {
 import { Card } from "@/components/ui/card";
 import { statusTone } from "@/lib/propone-metrics";
 
-const TEAL = "#0d9488";
-const AMBER = "#f59e0b";
+const TEAL = "#0d7a3f";
+const AMBER = "#d97706";
 const RED = "#dc2626";
-const BLUE = "#0369a1";
+const BLUE = "#1d6cb0";
 const GREY = "#94a3b8";
 const TONE_COLOR = { ok: TEAL, warn: AMBER, bad: RED } as const;
 
@@ -51,7 +51,7 @@ function TrendArea({
               <stop offset="100%" stopColor={TEAL} stopOpacity={0.02} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#e7eaee" vertical={false} />
+          <CartesianGrid stroke="#dcebe0" vertical={false} />
           <XAxis
             dataKey="week"
             tickFormatter={weekTick}
@@ -148,7 +148,7 @@ export function PropOneTrendsSection({
           <div className="h-[210px]" role="img" aria-label="Monthly work orders by status">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={woData} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
-                <CartesianGrid stroke="#e7eaee" vertical={false} />
+                <CartesianGrid stroke="#dcebe0" vertical={false} />
                 <XAxis
                   dataKey="month"
                   tickFormatter={monthTick}

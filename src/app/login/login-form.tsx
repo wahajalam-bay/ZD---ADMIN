@@ -47,7 +47,7 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="px-6 py-6">
+    <Card className="rounded-shell px-6 py-6 shadow-card-2">
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <div>
           <Label htmlFor="email">Email</Label>

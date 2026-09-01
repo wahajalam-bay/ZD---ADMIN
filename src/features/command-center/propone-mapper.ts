@@ -3,8 +3,8 @@ import { statusTone } from "@/lib/propone-metrics";
 import type { PropOneWidgetView } from "./propone-widgets";
 import { formatNumber } from "@/lib/utils";
 
-const TEAL = "#0d9488";
-const AMBER = "#f59e0b";
+const TEAL = "#0d7a3f";
+const AMBER = "#d97706";
 const RED = "#dc2626";
 
 const TONE_COLOR = { ok: TEAL, warn: AMBER, bad: RED } as const;
@@ -39,7 +39,7 @@ export function buildPropOneWidgetViews(widgets: PropOneWidgetData[]): PropOneWi
             { name: "Completed", value: m.completed, color: TEAL },
             { name: "Rejected", value: m.rejected, color: RED },
             { name: "Pending Procurement", value: m.pendingProcurement, color: AMBER },
-            { name: "In Progress / Other", value: m.other, color: "#0369a1" },
+            { name: "In Progress / Other", value: m.other, color: "#1d6cb0" },
           ].filter((s) => s.value > 0),
           center: String(m.all),
           centerLabel: "Total",

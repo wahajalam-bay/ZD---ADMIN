@@ -38,7 +38,7 @@ export function WeekSelector({
 
   const stateBadge =
     dataState === "PUBLISHED" ? (
-      <Badge className="bg-ink text-white">Published</Badge>
+      <Badge className="bg-accent-deep text-white">Published</Badge>
     ) : dataState === "PREVIEW" ? (
       <Badge className="bg-warn-bg text-warn">Approved · Preview</Badge>
     ) : (
@@ -69,7 +69,7 @@ export function WeekSelector({
           className={
             previewOn
               ? "rounded-full border border-warn bg-warn-bg px-3 py-1.5 text-[12px] font-bold text-warn"
-              : "rounded-full border border-line bg-panel px-3 py-1.5 text-[12px] font-semibold text-muted hover:bg-slate-50"
+              : "rounded-full border border-line bg-panel px-3 py-1.5 text-[12px] font-semibold text-muted hover:bg-panel2"
           }
           title="Preview includes approved data that has not been published yet"
         >

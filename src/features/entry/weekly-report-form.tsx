@@ -223,7 +223,7 @@ export function WeeklyReportForm(props: {
               }}
               className={cn(
                 "rounded-lg border px-4 py-2 text-[12.5px] font-bold disabled:opacity-60",
-                tracking === opt.value ? opt.cls : "border-line bg-panel text-muted hover:bg-slate-50",
+                tracking === opt.value ? opt.cls : "border-line bg-panel text-muted hover:bg-panel2",
               )}
             >
               {opt.label}

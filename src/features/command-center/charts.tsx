@@ -15,8 +15,8 @@ import {
   YAxis,
 } from "recharts";
 
-const TEAL = "#0d9488";
-const AMBER = "#f59e0b";
+const TEAL = "#0d7a3f";
+const AMBER = "#d97706";
 const RED = "#dc2626";
 
 /** Completed vs In Process by property (portfolio bar chart). */
@@ -29,13 +29,13 @@ export function PropertyTasksBar({
     <div className="h-[230px]" role="img" aria-label="Completed versus in-process tasks by property">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 16, right: 8, left: -18, bottom: 0 }}>
-          <CartesianGrid stroke="#e7eaee" vertical={false} />
+          <CartesianGrid stroke="#dcebe0" vertical={false} />
           <XAxis dataKey="name" tick={{ fontSize: 11.5, fontWeight: 600 }} axisLine={false} tickLine={false} />
           <YAxis allowDecimals={false} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
           <Tooltip cursor={{ fill: "#f1f5f9" }} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
           <Legend wrapperStyle={{ fontSize: 11 }} iconSize={10} />
           <Bar dataKey="completed" name="Completed" fill={TEAL} radius={[4, 4, 0, 0]} maxBarSize={42}>
-            <LabelList dataKey="completed" position="top" style={{ fontSize: 11, fontWeight: 700, fill: "#0f766e" }} />
+            <LabelList dataKey="completed" position="top" style={{ fontSize: 11, fontWeight: 700, fill: "#08643a" }} />
           </Bar>
           <Bar dataKey="inProcess" name="In Process" fill={AMBER} radius={[4, 4, 0, 0]} maxBarSize={42}>
             <LabelList dataKey="inProcess" position="top" style={{ fontSize: 11, fontWeight: 700, fill: "#b45309" }} />
@@ -67,7 +67,7 @@ export function DonutStat({
   ariaLabel: string;
 }) {
   const nonEmpty = slices.filter((s) => s.value > 0);
-  const display = nonEmpty.length > 0 ? nonEmpty : [{ name: "No data", value: 1, color: "#e7eaee" }];
+  const display = nonEmpty.length > 0 ? nonEmpty : [{ name: "No data", value: 1, color: "#dcebe0" }];
   return (
     <div className="flex items-center gap-5" role="img" aria-label={ariaLabel}>
       <div className="relative h-[150px] w-[150px] shrink-0">
@@ -106,7 +106,7 @@ export function DonutStat({
   );
 }
 
-export const CHART_COLORS = { TEAL, AMBER, RED, BLUE: "#0369a1", GREY: "#94a3b8" };
+export const CHART_COLORS = { TEAL, AMBER, RED, BLUE: "#1d6cb0", GREY: "#94a3b8" };
 
 /** Small bar chart for PropOne counts (e.g. Visits today/week/all-time). */
 export function CountsBar({
@@ -120,12 +120,12 @@ export function CountsBar({
     <div className="h-[170px]" role="img" aria-label={ariaLabel}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 18, right: 8, left: -18, bottom: 0 }}>
-          <CartesianGrid stroke="#e7eaee" vertical={false} />
+          <CartesianGrid stroke="#dcebe0" vertical={false} />
           <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 600 }} axisLine={false} tickLine={false} />
           <YAxis allowDecimals={false} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
           <Tooltip cursor={{ fill: "#f1f5f9" }} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
           <Bar dataKey="value" fill={TEAL} radius={[4, 4, 0, 0]} maxBarSize={48}>
-            <LabelList dataKey="value" position="top" style={{ fontSize: 11, fontWeight: 700, fill: "#0f766e" }} />
+            <LabelList dataKey="value" position="top" style={{ fontSize: 11, fontWeight: 700, fill: "#08643a" }} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>

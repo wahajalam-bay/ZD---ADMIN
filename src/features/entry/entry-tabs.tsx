@@ -23,7 +23,7 @@ export function EntryTabs({ propertyCode }: { propertyCode: string }) {
             aria-current={active ? "page" : undefined}
             className={cn(
               "rounded-md px-3.5 py-1.5 text-[12.5px] font-bold",
-              active ? "bg-accent text-white" : "text-muted hover:bg-slate-50",
+              active ? "bg-grad-green text-white shadow-[0_3px_10px_-2px_rgba(13,122,63,0.5)]" : "text-muted hover:bg-panel2",
             )}
           >
             {t.label}

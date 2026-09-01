@@ -96,9 +96,21 @@ export function ShellClient({
   }
 
   const brand = (
-    <div className="border-b border-line px-5 pb-4">
-      <h1 className="text-[15px] font-extrabold tracking-[0.04em]">ZAMEEN DEVELOPMENTS</h1>
-      <div className="mt-0.5 text-[11.5px] text-muted">Admin Properties · Command Center</div>
+    <div className="bg-grad-header mx-3 mb-3 flex items-center gap-3 rounded-[14px] px-3.5 py-3 shadow-card-2">
+      <span
+        aria-hidden
+        className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-gradient-to-br from-white to-[#d8f0e2] text-[13px] font-bold text-accent-deep shadow-[0_4px_12px_rgba(0,0,0,0.25),inset_0_0_0_1px_rgba(255,255,255,0.6)]"
+      >
+        ZA
+      </span>
+      <div className="min-w-0">
+        <h1 className="truncate text-[13.5px] leading-tight font-bold tracking-[0.2px] text-white">
+          Zameen Developments
+        </h1>
+        <div className="text-[9.5px] font-semibold tracking-[0.6px] text-white/70 uppercase">
+          Admin Properties · Command Center
+        </div>
+      </div>
     </div>
   );
 
@@ -108,7 +120,7 @@ export function ShellClient({
       <div className="truncate text-[11px] text-muted">{user.roleLabel}</div>
       <button
         onClick={signOut}
-        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-ink hover:bg-slate-50"
+        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-ink hover:bg-panel2"
       >
         <LogOut className="h-3.5 w-3.5" aria-hidden />
         Sign out
@@ -126,15 +138,25 @@ export function ShellClient({
       </aside>
 
       {/* Mobile top bar + drawer */}
-      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-line bg-panel px-4 py-3 lg:hidden">
-        <div>
-          <div className="text-[13px] font-extrabold tracking-wide">ZAMEEN DEVELOPMENTS</div>
-          <div className="text-[10px] text-muted">Admin Properties</div>
+      <div className="bg-grad-header fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 py-2.5 shadow-card-2 lg:hidden">
+        <div className="flex items-center gap-2.5">
+          <span
+            aria-hidden
+            className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-white to-[#d8f0e2] text-[11px] font-bold text-accent-deep"
+          >
+            ZA
+          </span>
+          <div>
+            <div className="text-[12.5px] leading-tight font-bold text-white">Zameen Developments</div>
+            <div className="text-[9px] font-semibold tracking-[0.6px] text-white/70 uppercase">
+              Admin Properties
+            </div>
+          </div>
         </div>
         <button
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
           onClick={() => setMobileOpen((v) => !v)}
-          className="rounded-lg border border-line p-2"
+          className="rounded-[10px] border border-white/25 bg-white/12 p-2 text-white"
         >
           {mobileOpen ? <X className="h-4 w-4" aria-hidden /> : <Menu className="h-4 w-4" aria-hidden />}
         </button>

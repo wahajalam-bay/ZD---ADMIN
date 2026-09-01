@@ -56,7 +56,7 @@ export function WidgetConfigMatrix({
                     <input
                       type="checkbox"
                       aria-label={`${p.name}: ${d.label} widget`}
-                      className="h-4.5 w-4.5 cursor-pointer accent-[#0d9488]"
+                      className="h-4.5 w-4.5 cursor-pointer accent-[#0d7a3f]"
                       checked={on}
                       disabled={busyCell === cell}
                       onChange={(e) => toggle(p.id, d.key, e.target.checked)}

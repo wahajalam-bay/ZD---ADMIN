@@ -30,7 +30,7 @@ const workflowStyles: Record<WorkflowStatus, string> = {
   SUBMITTED: "bg-info-bg text-info",
   RETURNED: "bg-bad-bg text-bad",
   APPROVED: "bg-accent-light text-accent-dark",
-  PUBLISHED: "bg-ink text-white",
+  PUBLISHED: "bg-accent-deep text-white",
 };
 
 const workflowLabels: Record<WorkflowStatus, string> = {
