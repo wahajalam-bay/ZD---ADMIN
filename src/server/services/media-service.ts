@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   checklistCategories,
@@ -59,7 +59,8 @@ export async function weeklyPhotosForWeek(
         ...(propertyId ? [eq(weeklyMedia.propertyId, propertyId)] : []),
       ),
     )
-    .orderBy(desc(weeklyMedia.uploadedAt));
+    // Deck/document order first (sortOrder), newest uploads last within ties.
+    .orderBy(asc(weeklyMedia.sortOrder), asc(weeklyMedia.uploadedAt));
 
   return rows.map((r) => ({
     id: r.id,

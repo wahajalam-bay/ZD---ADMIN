@@ -171,6 +171,28 @@ export async function testRedshiftConnectionAction(): Promise<
   });
 }
 
+/** Live sync from the PropOne Pakistan Redshift warehouse (Manager/Admin). */
+export async function syncRedshiftAction(): Promise<
+  ActionResult<{ properties: number; workOrders: number; visits: number; bookings: number; errors: string[] }>
+> {
+  return runAction(async () => {
+    const actor = await requireIntegrationAdmin();
+    const { PropOneRedshiftAdapter } = await import(
+      "@/server/integrations/propone/redshift-adapter"
+    );
+    const summary = await new PropOneRedshiftAdapter().syncAll(actor.id);
+    await recordAudit(db, {
+      actorUserId: actor.id,
+      action: "propone.sync",
+      entityType: "propone_integration",
+      metadata: { source: "redshift", ...summary },
+    });
+    revalidatePath("/admin/integrations");
+    revalidatePath("/command-center", "layout");
+    return summary;
+  });
+}
+
 export async function setWidgetEnabledAction(
   propertyId: string,
   domain: string,

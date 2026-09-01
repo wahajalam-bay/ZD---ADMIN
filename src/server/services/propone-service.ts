@@ -111,10 +111,12 @@ export async function propOneWidgetsForProperty(
         visitors: { period, latest: rows.slice(0, DETAIL_LIMIT) },
       });
     } else if (cfg.metricDomain === "CINEMA_BOOKINGS" || cfg.metricDomain === "AMENITY_BOOKINGS") {
+      // Amenity names come from the source ("CINEMA" in CSV imports, "Cinema"
+      // in the FMS warehouse) — match case-insensitively.
       const amenityFilter =
         cfg.metricDomain === "CINEMA_BOOKINGS"
-          ? eq(propOneBookings.amenity, "CINEMA")
-          : sql`${propOneBookings.amenity} <> 'CINEMA'`;
+          ? sql`${propOneBookings.amenity} ilike '%cinema%'`
+          : sql`${propOneBookings.amenity} not ilike '%cinema%'`;
       const rows = await db
         .select()
         .from(propOneBookings)

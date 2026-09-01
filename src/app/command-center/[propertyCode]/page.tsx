@@ -22,7 +22,7 @@ import { buildPropOneWidgetViews } from "@/features/command-center/propone-mappe
 import { PropOneWidgets } from "@/features/command-center/propone-widgets";
 import { BottleneckTable } from "@/features/command-center/bottleneck-table";
 import { DonutStat, CHART_COLORS } from "@/features/command-center/charts";
-import { PhotoStrip } from "@/features/command-center/photo-strip";
+import { AlbumGallery } from "@/features/command-center/album-gallery";
 import { WeekSelector } from "@/components/shell/week-selector";
 import { Card } from "@/components/ui/card";
 import { TaskStatusBadge, TrackingBadge, Badge } from "@/components/ui/badge";
@@ -254,7 +254,8 @@ export default async function PropertyDashboardPage({
         <h3>Progress Media</h3>
         <div className="line" />
       </div>
-      <PhotoStrip
+      <AlbumGallery
+        propertyName={property.name}
         photos={photos.map((p) => ({
           id: p.id,
           url: mediaUrl(p.storageKey),

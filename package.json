@@ -23,7 +23,8 @@
     "db:studio": "drizzle-kit studio",
     "db:dev": "tsx scripts/dev-db.ts",
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
-    "import:reference-photos": "tsx scripts/import-reference-photos.ts"
+    "import:reference-photos": "tsx scripts/import-reference-photos.ts",
+    "remove:demo-photos": "tsx scripts/remove-demo-photos.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1121.0",

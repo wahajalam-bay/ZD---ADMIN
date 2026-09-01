@@ -1,10 +1,13 @@
 import type { PropOneWidgetData } from "@/server/services/propone-service";
+import { statusTone } from "@/lib/propone-metrics";
 import type { PropOneWidgetView } from "./propone-widgets";
 import { formatNumber } from "@/lib/utils";
 
 const TEAL = "#0d9488";
 const AMBER = "#f59e0b";
 const RED = "#dc2626";
+
+const TONE_COLOR = { ok: TEAL, warn: AMBER, bad: RED } as const;
 
 function fmtDateTime(d: Date | null): string {
   if (!d) return "—";
@@ -26,6 +29,9 @@ export function buildPropOneWidgetViews(widgets: PropOneWidgetData[]): PropOneWi
           ...(m.pendingProcurement > 0
             ? [{ label: "Pending Procurement", value: formatNumber(m.pendingProcurement), tone: "warn" as const }]
             : []),
+          ...(m.other > 0
+            ? [{ label: "In Progress / Other", value: formatNumber(m.other), tone: "warn" as const }]
+            : []),
         ],
         chart: {
           kind: "donut",
@@ -33,6 +39,7 @@ export function buildPropOneWidgetViews(widgets: PropOneWidgetData[]): PropOneWi
             { name: "Completed", value: m.completed, color: TEAL },
             { name: "Rejected", value: m.rejected, color: RED },
             { name: "Pending Procurement", value: m.pendingProcurement, color: AMBER },
+            { name: "In Progress / Other", value: m.other, color: "#0369a1" },
           ].filter((s) => s.value > 0),
           center: String(m.all),
           centerLabel: "Total",
@@ -110,22 +117,27 @@ export function buildPropOneWidgetViews(widgets: PropOneWidgetData[]): PropOneWi
     }
     if (w.bookings) {
       const m = w.bookings;
+      // Status vocabulary differs per source (reference CSV: Attended/Pre-booked;
+      // FMS warehouse: Confirmed/Pending/Cancelled/…) — present the real counts.
+      const topStatuses = Object.entries(m.byStatus).sort((a, b) => b[1] - a[1]);
       return {
         domain: w.domain,
         label: w.label,
         kpis: [
           { label: "Bookings", value: formatNumber(m.total) },
-          { label: "Attended", value: formatNumber(m.attended), tone: "ok" },
-          { label: "Pre-booked", value: formatNumber(m.preBooked), tone: "warn" },
-          { label: "Cancelled", value: formatNumber(m.cancelled), tone: "bad" },
+          ...topStatuses.slice(0, 5).map(([status, count]) => ({
+            label: status,
+            value: formatNumber(count),
+            tone: statusTone(status),
+          })),
         ],
         chart: {
           kind: "donut",
-          slices: [
-            { name: "Attended", value: m.attended, color: TEAL },
-            { name: "Pre-booked", value: m.preBooked, color: AMBER },
-            { name: "Cancelled", value: m.cancelled, color: RED },
-          ].filter((s) => s.value > 0),
+          slices: topStatuses.map(([status, count], i) => ({
+            name: status,
+            value: count,
+            color: i < 4 ? TONE_COLOR[statusTone(status)] : "#94a3b8",
+          })),
           center: String(m.total),
           centerLabel: "Total",
         },

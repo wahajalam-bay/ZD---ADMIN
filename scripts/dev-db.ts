@@ -26,6 +26,9 @@ async function main() {
     password: PASSWORD,
     port: PORT,
     persistent: true,
+    // UTF-8 is required (visitor names etc. include Urdu/Arabic script);
+    // Windows initdb would otherwise default to WIN1252.
+    initdbFlags: ["--encoding=UTF8", "--locale=C"],
   });
 
   if (isNew) {

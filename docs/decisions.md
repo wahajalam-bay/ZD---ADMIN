@@ -120,18 +120,30 @@ with its original caption; reference hero photos become the property hero images
 Idempotent (dedupe by original filename per property). Base64 never enters the
 database.
 
-## 11. Redshift (PropOne Pakistan) — connection boundary ready, schema pending
+## 11. Redshift (PropOne Pakistan) — LIVE
 
-A Redshift adapter exists (`src/server/integrations/propone/redshift-adapter.ts`);
-Redshift speaks the PostgreSQL wire protocol so the standard `pg` driver connects
-directly via `PROPONE_REDSHIFT_URL` (+ optional `PROPONE_REDSHIFT_SCHEMA`), with a
-"Test Redshift connection" probe on Admin → Integrations and `PROPONE_MODE=redshift`
-support. **Still required from the data team:** cluster endpoint + read-only
-credentials, network reachability (VPN/IP allowlist) from the app host, and the
-PropOne Pakistan table/column layout including how rows map to properties — the
-warehouse schema is not invented here. Once supplied, only `fetchRecords` in the
-adapter needs implementing; normalized storage, dedupe/provenance, widgets and
-dashboards are already wired.
+The PropOne Pakistan warehouse (`magneto-pk`, schema `propone_zameenpk`, FMS
+tables) is connected via `PROPONE_REDSHIFT_URL` (Redshift speaks the PostgreSQL
+wire protocol; standard `pg` driver). "Sync from Redshift" on Admin →
+Integrations pulls, per property mapped through `properties.propOneExternalId`
+(= `fms_projects.id`: Opal=17, Aurum=9, Quadrangle=24):
+
+- `fms_work_orders` (+ statuses, units) → **Work Orders site-wise**
+- `fms_visits` (+ visitors, units, statuses) → **Visitor records site-wise**
+- `fms_amenity_reservations` (+ amenities, statuses) → **Amenities bookings site-wise**
+
+Sync mechanics: CDC snapshots are deduped to the latest row per business id;
+synced rows carry the `RS-` externalId prefix and are replaced per
+property+domain in a transaction (idempotent, reflects updates/deletes, never
+touches CSV-imported rows); every property+domain sync is a recorded
+`propone_sync_runs` row (mode REDSHIFT). Inbound strings are sanitized (NUL/
+control chars) and the application database is UTF-8 (required for Urdu/Arabic
+visitor names — the embedded dev cluster is initialised with
+`--encoding=UTF8`). Booking/work-order widgets present real status
+vocabularies (`byStatus`) rather than assuming the reference CSV's labels.
+Credentials live only in `.env` (never committed). Remaining external inputs:
+none for these three domains; a production service account (rather than a
+personal login) is recommended before go-live.
 
 ## 12. Review-time editing
 

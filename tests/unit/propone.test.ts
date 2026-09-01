@@ -53,13 +53,23 @@ describe("aggregateBookings", () => {
       ...Array.from({ length: 4 }, () => ({ status: "Pre-booked" })),
       ...Array.from({ length: 2 }, () => ({ status: "Cancelled" })),
     ];
-    expect(aggregateBookings(rows)).toEqual({
+    expect(aggregateBookings(rows)).toMatchObject({
       total: 22,
       attended: 16,
       preBooked: 4,
       cancelled: 2,
       other: 0,
     });
+  });
+  it("exposes raw per-status counts for source-agnostic dashboards (FMS statuses)", () => {
+    const m = aggregateBookings([
+      { status: "Confirmed" },
+      { status: "Confirmed" },
+      { status: "Pending" },
+      { status: "Cancelled" },
+    ]);
+    expect(m.byStatus).toEqual({ Confirmed: 2, Pending: 1, Cancelled: 1 });
+    expect(m.other).toBe(3); // Confirmed/Pending are not in the legacy buckets
   });
 });
 

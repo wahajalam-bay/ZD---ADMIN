@@ -70,18 +70,37 @@ export interface BookingMetrics {
   preBooked: number;
   cancelled: number;
   other: number;
+  /** Raw per-status counts — supports any source vocabulary (CSV or FMS). */
+  byStatus: Record<string, number>;
 }
 
 export function aggregateBookings(rows: Array<{ status: string }>): BookingMetrics {
-  const m: BookingMetrics = { total: rows.length, attended: 0, preBooked: 0, cancelled: 0, other: 0 };
+  const m: BookingMetrics = {
+    total: rows.length,
+    attended: 0,
+    preBooked: 0,
+    cancelled: 0,
+    other: 0,
+    byStatus: {},
+  };
   for (const r of rows) {
-    const s = r.status.trim().toLowerCase();
+    const raw = r.status.trim();
+    const s = raw.toLowerCase();
+    m.byStatus[raw] = (m.byStatus[raw] ?? 0) + 1;
     if (s === "attended") m.attended++;
     else if (s === "pre-booked" || s === "prebooked") m.preBooked++;
     else if (s === "cancelled" || s === "canceled") m.cancelled++;
     else m.other++;
   }
   return m;
+}
+
+/** Tone for a status label — shared by booking/work-order presentations. */
+export function statusTone(status: string): "ok" | "warn" | "bad" {
+  const s = status.trim().toLowerCase();
+  if (["attended", "completed", "confirmed", "verified", "approved"].includes(s)) return "ok";
+  if (["cancelled", "canceled", "rejected", "expired", "no show", "no-show"].includes(s)) return "bad";
+  return "warn";
 }
 
 export function countInPeriod(

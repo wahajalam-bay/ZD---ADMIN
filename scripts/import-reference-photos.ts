@@ -99,14 +99,25 @@ async function main() {
     }
 
     const existingRows = await db
-      .select({ originalFilename: weeklyMedia.originalFilename, storageKey: weeklyMedia.storageKey })
+      .select({
+        id: weeklyMedia.id,
+        originalFilename: weeklyMedia.originalFilename,
+        storageKey: weeklyMedia.storageKey,
+        sortOrder: weeklyMedia.sortOrder,
+      })
       .from(weeklyMedia)
       .where(eq(weeklyMedia.propertyId, property.id));
-    const existingByFilename = new Map(existingRows.map((r) => [r.originalFilename, r.storageKey]));
+    const existingByFilename = new Map(existingRows.map((r) => [r.originalFilename, r]));
 
     let imported = 0;
-    for (const photo of photos) {
-      if (existingByFilename.has(photo.file)) {
+    for (const [seq, photo] of photos.entries()) {
+      const sortOrder = photo.slide_no * 100 + seq;
+      const existing = existingByFilename.get(photo.file);
+      if (existing) {
+        // Backfill deck ordering on already-imported photos.
+        if (existing.sortOrder !== sortOrder) {
+          await db.update(weeklyMedia).set({ sortOrder }).where(eq(weeklyMedia.id, existing.id));
+        }
         totalSkipped++;
         continue;
       }
@@ -122,21 +133,30 @@ async function main() {
         const { key, thumbKey } = buildObjectKey(property.id, "weekly");
         await storage.put(key, processed.main.buffer, processed.main.contentType);
         await storage.put(thumbKey, processed.thumb.buffer, processed.thumb.contentType);
-        await db.insert(weeklyMedia).values({
-          weeklyReportId: report.id,
-          propertyId: property.id,
-          mediaType: "IMAGE",
-          storageKey: key,
-          thumbnailKey: thumbKey,
+        const inserted = await db
+          .insert(weeklyMedia)
+          .values({
+            weeklyReportId: report.id,
+            propertyId: property.id,
+            mediaType: "IMAGE",
+            storageKey: key,
+            thumbnailKey: thumbKey,
+            originalFilename: photo.file,
+            mimeType: processed.main.contentType,
+            sizeBytes: processed.main.buffer.byteLength,
+            width: processed.main.width,
+            height: processed.main.height,
+            caption: photo.title,
+            sortOrder,
+            uploadedBy: uploader.id,
+          })
+          .returning({ id: weeklyMedia.id });
+        existingByFilename.set(photo.file, {
+          id: inserted[0]!.id,
           originalFilename: photo.file,
-          mimeType: processed.main.contentType,
-          sizeBytes: processed.main.buffer.byteLength,
-          width: processed.main.width,
-          height: processed.main.height,
-          caption: photo.title,
-          uploadedBy: uploader.id,
+          storageKey: key,
+          sortOrder,
         });
-        existingByFilename.set(photo.file, key);
         imported++;
       } catch (err) {
         console.warn(`  ! ${photo.file}: ${String(err)} — skipped`);
@@ -146,7 +166,7 @@ async function main() {
     console.log(`  ${property.name}: imported ${imported}/${photos.length} photos`);
 
     // Hero image from the reference hero photo.
-    const heroKey = existingByFilename.get(HEROES[siteKey] ?? "");
+    const heroKey = existingByFilename.get(HEROES[siteKey] ?? "")?.storageKey;
     if (heroKey && !property.heroImageKey) {
       await db.update(properties).set({ heroImageKey: heroKey, updatedAt: new Date() }).where(eq(properties.id, property.id));
       console.log(`  ${property.name}: hero image set (${HEROES[siteKey]})`);

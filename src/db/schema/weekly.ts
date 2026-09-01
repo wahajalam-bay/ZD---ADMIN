@@ -96,6 +96,8 @@ export const weeklyMedia = pgTable(
     width: integer(),
     height: integer(),
     caption: text().notNull().default(""),
+    /** Presentation order within the report (e.g. source deck slide order). */
+    sortOrder: integer().notNull().default(0),
     uploadedBy: text()
       .notNull()
       .references(() => user.id),
