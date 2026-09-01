@@ -45,7 +45,10 @@ export function PageHeader({
                 <React.Fragment key={`${c.label}-${i}`}>
                   {i > 0 ? <ChevronRight className="h-3 w-3 text-muted/60" aria-hidden /> : null}
                   {c.href ? (
-                    <Link href={c.href} className="font-semibold text-accent-dark hover:underline">
+                    <Link
+                      href={c.href}
+                      className="inline-flex min-h-8 items-center font-semibold text-accent-dark hover:underline sm:min-h-0"
+                    >
                       {c.label}
                     </Link>
                   ) : (

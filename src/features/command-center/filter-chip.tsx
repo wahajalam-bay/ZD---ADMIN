@@ -26,7 +26,8 @@ export function FilterChip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] transition-colors",
+        // 36px tap target on phones, dense chip from `sm` up.
+        "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] transition-colors sm:min-h-0 sm:px-2.5 sm:py-1 sm:text-[11.5px]",
         active
           ? "border-transparent bg-accent-deep font-bold text-white"
           : "border-line bg-panel font-semibold text-muted hover:border-line-strong hover:text-ink",

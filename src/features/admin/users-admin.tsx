@@ -129,7 +129,56 @@ export function UsersAdmin({ users, properties }: { users: UserRow[]; properties
         </Button>
       </div>
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* One card per account on phones; the six-column table from `sm` up. */}
+        <ul className="divide-y divide-line sm:hidden" data-testid="users-cards">
+          {users.map((u) => (
+            <li key={u.id} className="flex items-start gap-3 px-3.5 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13.5px] font-bold text-ink">{u.name}</p>
+                <p className="truncate font-mono text-[11.5px] text-muted">{u.email}</p>
+                <p className="mt-1 text-[12px] text-muted">
+                  {ROLE_LABELS[u.role as Role] ?? u.role}
+                  {u.propertyName ? ` · ${u.propertyName}` : ""}
+                </p>
+                <div className="mt-1.5">
+                  {u.banned ? (
+                    <Badge tone="red" icon={ShieldOff} size="sm">
+                      Disabled
+                    </Badge>
+                  ) : (
+                    <Badge tone="green" icon={ShieldCheck} size="sm">
+                      Active
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <ActionMenu
+                testId={`user-actions-mobile-${u.email}`}
+                label={`Actions for ${u.email}`}
+                items={[
+                  {
+                    label: "Edit role & property",
+                    icon: Pencil,
+                    onSelect: () => {
+                      setEditUser(u);
+                      setERole((u.role as Role) ?? "SITE_USER");
+                      setEProperty(u.propertyId ?? properties[0]?.id ?? "");
+                    },
+                  },
+                  { label: "Reset password", icon: KeyRound, onSelect: () => setResetUser(u) },
+                  {
+                    label: u.banned ? "Reactivate account" : "Disable account",
+                    icon: u.banned ? ShieldCheck : ShieldOff,
+                    danger: !u.banned,
+                    onSelect: () => toggleDisabled(u),
+                  },
+                ]}
+              />
+            </li>
+          ))}
+        </ul>
+
+        <div className="table-scroll hidden sm:block">
           <table className="z-table" data-testid="users-table">
             <thead>
               <tr>

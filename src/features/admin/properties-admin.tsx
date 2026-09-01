@@ -110,7 +110,7 @@ export function PropertiesAdmin({ properties }: { properties: PropertyRow[] }) {
         </Button>
       </div>
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="z-table">
             <thead>
               <tr>

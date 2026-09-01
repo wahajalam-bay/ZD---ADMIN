@@ -80,7 +80,7 @@ function Stat({
       data-testid={testId}
       title={hint}
       aria-label={`${label}: ${value}. View breakdown.`}
-      className="-mx-1.5 -my-1 min-w-0 rounded-input px-1.5 py-1 text-start transition-colors hover:bg-panel2 focus-visible:bg-panel2"
+      className="-mx-1.5 min-h-11 min-w-0 rounded-input px-1.5 py-1.5 text-start transition-colors hover:bg-panel2 focus-visible:bg-panel2 sm:-my-1 sm:min-h-0 sm:py-1"
     >
       {body}
     </button>
@@ -130,7 +130,7 @@ export function PropertyHealthCard({
               <Link
                 href={href}
                 data-testid={`property-link-${p.code}`}
-                className="text-ink transition-colors hover:text-accent-dark"
+                className="inline-flex min-h-9 items-center text-ink transition-colors hover:text-accent-dark sm:min-h-0"
               >
                 {p.name}
               </Link>
@@ -196,7 +196,8 @@ export function PropertyHealthCard({
 
         <Link
           href={href}
-          className="mt-3 inline-flex items-center gap-1 self-start text-[11.5px] font-bold text-accent-dark opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+          // Always visible on touch devices — hover cannot reveal it there.
+          className="mt-3 inline-flex min-h-9 items-center gap-1 self-start text-[12px] font-bold text-accent-dark transition-opacity sm:min-h-0 sm:text-[11.5px] sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
         >
           Open property <ArrowRight className="h-3 w-3" aria-hidden />
         </Link>

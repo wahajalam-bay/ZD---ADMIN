@@ -553,7 +553,7 @@ export function StatusComposition({
               disabled={!onSelect}
               onClick={() => onSelect?.(r.name)}
               className={cn(
-                "flex w-full items-center gap-2 rounded-input px-1.5 py-1 text-[12px] transition-colors",
+                "flex min-h-9 w-full items-center gap-2 rounded-input px-2 py-1.5 text-[12px] transition-colors sm:min-h-0 sm:px-1.5 sm:py-1",
                 onSelect && "hover:bg-panel2",
                 activeName === r.name && "bg-panel2 font-semibold",
               )}

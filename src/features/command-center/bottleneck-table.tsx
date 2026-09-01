@@ -38,7 +38,44 @@ export function BottleneckTable({
 
   return (
     <>
-      <div className="overflow-x-auto">
+      {/* Phones get a card per issue — a seven-column table is unreadable at
+          390px even with horizontal scrolling. */}
+      <ul className="divide-y divide-line sm:hidden" data-testid="bottleneck-cards">
+        {rows.map((row) => (
+          <li key={row.responseId}>
+            <button
+              type="button"
+              onClick={() => setOpen(row)}
+              data-testid={`bottleneck-card-${row.responseId}`}
+              className="w-full px-3.5 py-3 text-start transition-colors active:bg-panel2"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <SeverityBadge severity={row.severity} size="sm" />
+                {row.workflowStatus ? <StatusBadge status={row.workflowStatus} size="sm" /> : null}
+                <span
+                  className={cn(
+                    "ms-auto font-mono text-[11px]",
+                    row.ageDays >= 3 ? "font-bold text-bad" : "text-muted",
+                  )}
+                >
+                  {row.ageDays === 0 ? "today" : `open ${row.ageDays}d`}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[13px] font-bold text-ink">{row.itemName}</p>
+              <p className="text-[11.5px] text-muted">{row.categoryName}</p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-ink">{row.issue}</p>
+              <span className="mt-2 inline-flex items-center gap-1.5 text-[11.5px] font-bold text-accent-dark">
+                <Camera className="h-3.5 w-3.5" aria-hidden />
+                {row.evidence.length > 0
+                  ? `${row.evidence.length} photo${row.evidence.length > 1 ? "s" : ""} →`
+                  : "No evidence →"}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <div className="table-scroll hidden sm:block">
         <table className="z-table z-table--exec" data-testid="bottleneck-table">
           <thead>
             <tr>

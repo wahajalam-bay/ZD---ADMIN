@@ -34,7 +34,10 @@ export default async function EntryPropertyLayout({
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link href="/entry" className="text-xs font-semibold text-accent-dark hover:underline">
+          <Link
+            href="/entry"
+            className="inline-flex min-h-9 items-center text-[13px] font-semibold text-accent-dark hover:underline sm:min-h-0 sm:text-xs"
+          >
             ← Data Entry
           </Link>
           <h2 className="mt-0.5 text-[20px] font-bold" data-testid="entry-property-name">

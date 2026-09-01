@@ -227,7 +227,7 @@ export function WeeklyReportForm(props: {
               type="date"
               value={props.weekStart}
               onChange={(e) => e.target.value && router.push(`${pathname}?week=${e.target.value}`)}
-              className="bg-transparent font-mono text-[12.5px] text-ink outline-none"
+              className="min-h-9 bg-transparent font-mono text-[16px] text-ink outline-none sm:min-h-0 sm:text-[12.5px]"
             />
           </div>
           <p className="mt-1 text-[11px] text-muted">{weekRangeLabel(props.weekStart)}</p>

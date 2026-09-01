@@ -32,7 +32,7 @@ export function WidgetConfigMatrix({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="table-scroll">
       <table className="z-table">
         <thead>
           <tr>

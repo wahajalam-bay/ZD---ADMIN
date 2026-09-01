@@ -476,7 +476,7 @@ function LegendButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-2 rounded-input px-1.5 py-1 text-start transition-colors hover:bg-panel2"
+      className="flex min-h-9 items-center gap-2 rounded-input px-2 py-1.5 text-start transition-colors hover:bg-panel2 sm:min-h-0 sm:px-1.5 sm:py-1"
     >
       <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: color }} aria-hidden />
       <span className="flex-1 text-ink">{label}</span>

@@ -30,27 +30,49 @@ The original prototypes are preserved in [/reference](./reference/). See
 Next.js 16 (App Router, standalone output) · React 19 · TypeScript (strict) ·
 Node 24 LTS · pnpm · PostgreSQL 18 · Drizzle ORM/Kit · Better Auth (server sessions,
 admin plugin) · Tailwind CSS 4 · Recharts · React Hook Form + Zod · sharp ·
-S3-compatible object storage (AWS S3 / Cloudflare R2 / MinIO) · Vitest · Playwright.
+disk-backed media storage (no object store required) · Vitest · Playwright.
 
-## Architecture
+## Project structure
 
 ```
-src/
-  app/                     routes (entry, review, command-center, admin, api)
-  components/              UI kit + application shell
-  features/                feature components (entry forms, review, dashboards, admin)
-  lib/                     pure shared logic (roles/permissions, weeks, compliance,
-                           metrics, validation) — unit-tested
-  server/
-    auth/                  Better Auth config + session reader
-    permissions/           authoritative guards (requirePropertyAccess, requireRole …)
-    services/              data-access/KPI services (all SQL lives here)
-    actions/               server actions (validated, authorized, audited)
-    integrations/propone/  adapter boundary, CSV import, validators
-    storage/               S3/local drivers, image validation + thumbnails
-  db/schema/               Drizzle schema        db/seeds/  baseline + demo seeds
-drizzle/                   version-controlled migrations
-tests/unit                 Vitest    tests/e2e   Playwright
+.
+├── src/
+│   ├── app/                      routes — App Router
+│   │   ├── command-center/       management dashboards (portfolio, property, photos)
+│   │   ├── entry/                Data Entry Engine (checklists, weekly reports)
+│   │   ├── review/               review, return, approve, publish
+│   │   ├── admin/                users, properties, integrations, audit
+│   │   ├── api/                  auth handler, health, authorised media reads
+│   │   └── login/
+│   ├── components/
+│   │   ├── ui/                   design-system primitives (KPI card, panel, table…)
+│   │   ├── shell/                app shell, sidebar, page header, reporting controls
+│   │   └── theme/                light / dark / presentation modes
+│   ├── features/                 feature UI, one folder per area
+│   │   ├── command-center/       boards, charts, drill-down panels, PropOne
+│   │   ├── entry/                checklist + weekly report forms
+│   │   ├── review/               review queue and detail views
+│   │   └── admin/                user, property and integration admin
+│   ├── lib/                      pure, unit-tested logic (roles, weeks, compliance,
+│   │                             metrics, validation) — no I/O
+│   ├── server/
+│   │   ├── auth/                 Better Auth config + session reader
+│   │   ├── permissions/          authoritative guards (property + role)
+│   │   ├── services/             all SQL lives here
+│   │   ├── actions/              server actions — validated, authorised, audited
+│   │   ├── integrations/propone/ Redshift/CSV adapters behind one boundary
+│   │   ├── storage/              disk media driver, image validation, thumbnails
+│   │   └── env.ts                validated environment, fails fast
+│   └── db/
+│       ├── schema/               Drizzle tables
+│       └── seeds/                baseline · demo · legacy Command Center week
+├── drizzle/                      version-controlled migrations
+├── docker/                       container entrypoint (runs migrations, then serves)
+├── docs/                         audit, decisions, deployment, backup, UI/UX
+├── reference/                    the original prototypes, preserved verbatim
+├── scripts/                      operator CLIs (dev DB, admin bootstrap, imports)
+├── tests/unit/                   Vitest
+└── tests/e2e/                    Playwright
 ```
 
 Client components never touch the database. Every property-scoped read/write is
@@ -71,20 +93,34 @@ The seeded portfolio is the built-and-functional set: **Opal, Aurum, Quadrangle*
 The system is fully property-driven — new properties are added at
 **Admin → Properties** without code changes.
 
-## Local development
+## Run it
+
+### Docker (everything in one command)
+
+```bash
+cp .env.example .env
+# set BETTER_AUTH_SECRET and POSTGRES_PASSWORD in .env:
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+
+docker compose up -d --build          # Postgres 18 + the app; migrations run on boot
+docker compose exec app sh -c 'cd /tools && node_modules/.bin/tsx scripts/bootstrap-admin.ts'
+```
+
+Then open <http://localhost:3000>. Media is stored on the `media` volume — there is
+**no S3 or MinIO to configure**. Back that volume up with the database
+([docs/backup-and-restore.md](./docs/backup-and-restore.md)).
+
+### Local development
 
 ```bash
 pnpm install
-docker compose up -d postgres minio createbucket   # PostgreSQL 18 + MinIO (private bucket)
-cp .env.example .env                               # defaults match docker-compose
-pnpm db:migrate                                    # apply migrations
-pnpm db:seed:demo                                  # baseline + labeled DEMO data + demo accounts
-pnpm dev                                           # http://localhost:3000
+pnpm db:dev                # embedded PostgreSQL 18 on port 5544
+cp .env.example .env       # DATABASE_URL default matches pnpm db:dev
+pnpm db:migrate
+pnpm db:seed:demo          # baseline + labelled DEMO data + demo accounts
+pnpm db:seed:legacy        # the legacy Command Center week, merged verbatim
+pnpm dev                   # http://localhost:3000
 ```
-
-**No Docker?** `pnpm db:dev` boots a real embedded PostgreSQL 18 on port 5544
-(set `DATABASE_URL=postgres://zameen:zameen@127.0.0.1:5544/zameen_admin`) and
-`STORAGE_DRIVER=local` stores media on disk. Development only.
 
 ### Demo accounts (`pnpm db:seed:demo`, development only)
 
@@ -106,6 +142,7 @@ Demo records are labeled `DEMO` and must never be seeded in production.
 | `pnpm db:generate` | Generate a migration from schema changes |
 | `pnpm db:migrate` | Apply migrations (the only schema mechanism — no auto-sync) |
 | `pnpm db:seed` / `pnpm db:seed:demo` | Baseline (properties + 22 checklist definitions) / + demo data |
+| `pnpm db:seed:legacy` | Merge the legacy Command Center week (verbatim tasks, issues, summaries) |
 | `pnpm db:studio` | Drizzle Studio |
 | `pnpm bootstrap:admin` | Create the first production Manager/Admin |
 | `pnpm lint` / `pnpm typecheck` | ESLint / strict TypeScript |
@@ -123,7 +160,21 @@ already wired. Details in [docs/decisions.md](./docs/decisions.md).
 
 ## Production
 
-Multi-stage `Dockerfile` (Node 24, standalone output, non-root, healthcheck) — see
-[docs/deployment.md](./docs/deployment.md) for topology, environment, migrations,
-initial admin bootstrap, upgrades, and
+Multi-stage `Dockerfile` (Node 24, standalone output, non-root, healthcheck) plus a
+`docker-compose.yml` that brings up PostgreSQL and the app together. Migrations run
+automatically at container start; nothing seeds itself.
+
+Media lives on a mounted volume rather than an object store — the app refuses to
+start in production if `STORAGE_MEDIA_PATH` is not an absolute path, so photographs
+can never be written somewhere that disappears on the next deploy.
+
+See [docs/deployment.md](./docs/deployment.md) for topology, environment, TLS,
+upgrades and the admin bootstrap, and
 [docs/backup-and-restore.md](./docs/backup-and-restore.md) for backups.
+
+## Mobile
+
+Site teams file checklists from a phone, so every screen is built for touch: a
+drawer navigation, 36–44px tap targets, 16px form text (iOS zooms anything smaller),
+safe-area padding for notched devices, and wide data tables that become card lists
+below 640px instead of scrolling sideways.

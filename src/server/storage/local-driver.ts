@@ -3,8 +3,16 @@ import path from "node:path";
 import type { StorageDriver, StoredObject } from "./types";
 
 /**
- * Development-only disk storage. Keys are sanitized and resolved strictly
- * beneath the configured root to prevent path traversal.
+ * Disk-backed object storage — the supported storage mode for this deployment.
+ *
+ * Photographs are written under `STORAGE_MEDIA_PATH`, which must be a mounted
+ * volume that survives container replacement (see docs/deployment.md). Objects
+ * are NEVER served from a public directory: every read goes through
+ * `/api/media/[...key]`, which authorises the caller and enforces property
+ * isolation before a single byte is returned.
+ *
+ * Keys are resolved strictly beneath the configured root, so a crafted key
+ * (`../../etc/passwd`, an absolute path, a symlinked parent) cannot escape it.
  */
 export class LocalStorageDriver implements StorageDriver {
   readonly kind = "local" as const;
@@ -15,8 +23,12 @@ export class LocalStorageDriver implements StorageDriver {
   }
 
   private resolve(key: string): string {
+    // Reject anything that is not a plain relative key before touching disk.
+    if (!key || path.isAbsolute(key) || key.includes("\0")) {
+      throw new Error("Invalid storage key");
+    }
     const safe = path.resolve(this.root, key);
-    if (!safe.startsWith(this.root + path.sep) && safe !== this.root) {
+    if (!safe.startsWith(this.root + path.sep)) {
       throw new Error("Invalid storage key");
     }
     return safe;
@@ -25,7 +37,11 @@ export class LocalStorageDriver implements StorageDriver {
   async put(key: string, body: Buffer, contentType: string): Promise<void> {
     const file = this.resolve(key);
     await fs.mkdir(path.dirname(file), { recursive: true });
-    await fs.writeFile(file, body);
+    // Write to a temp file then rename, so a crashed write never leaves a
+    // half-written photograph behind a valid database row.
+    const tmp = `${file}.${process.pid}.tmp`;
+    await fs.writeFile(tmp, body);
+    await fs.rename(tmp, file);
     await fs.writeFile(`${file}.meta`, JSON.stringify({ contentType }));
   }
 
@@ -56,5 +72,17 @@ export class LocalStorageDriver implements StorageDriver {
     } catch {
       // already gone
     }
+  }
+
+  /** Startup check: the media volume must exist and be writable. */
+  async verifyWritable(): Promise<void> {
+    await fs.mkdir(this.root, { recursive: true });
+    const probe = path.join(this.root, `.write-probe-${process.pid}`);
+    await fs.writeFile(probe, "ok");
+    await fs.unlink(probe);
+  }
+
+  get rootPath(): string {
+    return this.root;
   }
 }

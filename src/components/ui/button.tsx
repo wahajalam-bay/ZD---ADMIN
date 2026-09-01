@@ -15,10 +15,14 @@ const variants: Record<Variant, string> = {
   dark: "border border-transparent bg-accent-deep text-white hover:bg-accent-dark",
 };
 
+/**
+ * Touch first: every button clears a 36px target on phones and tightens to the
+ * design system's dense desktop sizing from `sm` up (§1.4).
+ */
 const sizes: Record<Size, string> = {
-  sm: "px-2.5 py-1.5 text-[11.5px]",
-  md: "px-3.5 py-2 text-[12.5px]",
-  lg: "px-4 py-2.5 text-[13px]",
+  sm: "min-h-9 px-3 py-1.5 text-[12px] sm:min-h-0 sm:px-2.5 sm:text-[11.5px]",
+  md: "min-h-10 px-4 py-2 text-[13px] sm:min-h-0 sm:px-3.5 sm:text-[12.5px]",
+  lg: "min-h-11 px-4 py-2.5 text-[13.5px] sm:min-h-0 sm:text-[13px]",
 };
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

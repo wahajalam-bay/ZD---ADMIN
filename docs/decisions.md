@@ -114,13 +114,30 @@ required, it should store references, not duplicated numbers.
 
 ## 7. Media storage
 
-S3-compatible object storage (AWS S3 / Cloudflare R2 / MinIO) with **private**
-objects; the database stores keys + metadata only. Uploads are server-proxied through
-server actions (validated + re-encoded via sharp, EXIF stripped, randomized keys,
+**A mounted disk volume, not an object store** — decided with the client, who does
+not want an S3 dependency. The AWS SDK and every `S3_*` setting were removed rather
+than left as dead configuration.
+
+The database stores keys + metadata only. Uploads are server-proxied through server
+actions (validated and re-encoded via sharp, EXIF stripped, randomised keys,
 thumbnails generated) rather than browser-presigned — simpler, and it guarantees
-authorization + normalization happen before any byte is stored. Reads go through
-`/api/media/*`, which authorizes per property on every request. A local-disk driver
-exists for development machines without Docker (never for production).
+authorisation and normalisation happen before any byte is stored. Reads go through
+`/api/media/*`, which authorises per property on every request; media is never
+placed in `public/` and never served straight off disk.
+
+What this trades away, recorded honestly:
+
+- **Durability is now the volume's problem.** An object store gives redundancy for
+  free; a disk does not. The media volume must be backed up on the same schedule as
+  the database ([backup-and-restore.md](./backup-and-restore.md)).
+- **Horizontal scaling needs shared storage.** Two app replicas require the same
+  volume (NFS/EFS or equivalent). One container plus a proxy is the intended shape.
+- **Guardrail:** `STORAGE_MEDIA_PATH` must be absolute in production or the app
+  refuses to boot, so photographs cannot silently be written into a container layer
+  that the next deploy discards.
+
+`StorageDriver` remains an interface, so an object-store driver can be added later
+without touching a single caller.
 
 ## 8. Password reset
 

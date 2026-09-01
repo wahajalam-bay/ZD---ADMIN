@@ -142,7 +142,7 @@ export function ReviewQueue({
             type="date"
             value={search.get("week") ?? ""}
             onChange={(e) => set("week", e.target.value)}
-            className="font-mono text-[11.5px]"
+            className="font-mono text-[16px] sm:text-[11.5px]"
           />
         </div>
       </Card>

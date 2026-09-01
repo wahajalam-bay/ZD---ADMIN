@@ -72,7 +72,7 @@ export function ReviewFilters({
           type="date"
           value={search.get("week") ?? ""}
           onChange={(e) => set("week", e.target.value)}
-          className="font-mono text-xs"
+          className="font-mono text-[16px] sm:text-xs"
         />
       </div>
     </div>

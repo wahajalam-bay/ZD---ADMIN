@@ -268,9 +268,11 @@ export function ShellClient({
         </div>
       ) : null}
 
+      {/* `viewportFit: cover` paints into the notch — `safe-area` adds the
+          inset as margin so the Tailwind padding scale still applies. */}
       <main
         id="main"
-        className="w-full flex-1 px-4 pt-16 pb-14 sm:px-6 lg:ms-[236px] lg:px-8 lg:pt-5"
+        className="safe-area w-full flex-1 px-4 pt-16 pb-14 sm:px-6 lg:ms-[236px] lg:px-8 lg:pt-5"
       >
         <div className="mx-auto w-full" style={{ maxWidth: "var(--canvas-max)" }}>
           {children}

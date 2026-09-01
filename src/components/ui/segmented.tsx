@@ -51,7 +51,10 @@ export function Segmented<T extends string>({
             onClick={() => onChange(opt.value)}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap transition-all duration-200",
-              size === "sm" ? "px-2.5 py-1 text-[11px]" : "px-3.5 py-1.5 text-[12px]",
+              // Comfortable to tap on a phone, dense on the desktop grid.
+              size === "sm"
+                ? "min-h-9 px-3 py-1.5 text-[12px] sm:min-h-0 sm:px-2.5 sm:py-1 sm:text-[11px]"
+                : "min-h-10 px-4 py-2 text-[13px] sm:min-h-0 sm:px-3.5 sm:py-1.5 sm:text-[12px]",
               selected
                 ? "bg-panel text-ink shadow-card"
                 : "text-muted hover:text-ink",

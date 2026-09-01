@@ -260,7 +260,7 @@ export default async function PropertyDashboardPage({
       <SectionHeader className="mt-8" title="Weekly tasks" icon="clipboard" />
       <Card className="overflow-hidden">
         {tasks.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div className="table-scroll">
             <table className="z-table" data-testid="task-table">
               <thead>
                 <tr>

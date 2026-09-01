@@ -106,7 +106,7 @@ export default async function AdminIntegrationsPage() {
         {status.recentRuns.length === 0 ? (
           <div className="px-5 py-7 text-center text-[13px] text-muted">No syncs yet.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-scroll">
             <table className="z-table">
               <thead>
                 <tr>

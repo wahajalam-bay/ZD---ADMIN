@@ -154,7 +154,7 @@ export function PropOneSection({
                 <button
                   type="button"
                   onClick={() => setTab(d.key)}
-                  className="ms-auto text-[11px] font-bold text-accent-dark hover:underline"
+                  className="ms-auto inline-flex min-h-9 items-center px-1 text-[12px] font-bold text-accent-dark hover:underline sm:min-h-0 sm:px-0 sm:text-[11px]"
                 >
                   View details
                 </button>
@@ -330,7 +330,7 @@ function PropOneTableView({
           None of the latest synced {label.toLowerCase()} match this filter.
         </div>
       ) : (
-        <div className="max-h-[380px] overflow-auto">
+        <div className="table-scroll max-h-[380px] overflow-y-auto">
           <table className="z-table z-table--exec">
             <thead className="sticky">
               <tr>

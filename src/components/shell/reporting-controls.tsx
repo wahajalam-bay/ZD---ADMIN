@@ -44,17 +44,19 @@ export function ReportingControls({
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
       <label className="sr-only" htmlFor="reporting-week">
         Reporting week
       </label>
-      <div className="flex items-center gap-1.5 rounded-full border border-line bg-panel px-2.5 py-1">
-        <CalendarRange className="h-3.5 w-3.5 text-muted" aria-hidden />
+      {/* The week picker is the most-used control on a phone: full width and a
+          40px target there, compact pill from `sm` up. */}
+      <div className="flex min-h-10 w-full items-center gap-1.5 rounded-full border border-line bg-panel px-3 sm:min-h-0 sm:w-auto sm:px-2.5 sm:py-1">
+        <CalendarRange className="h-4 w-4 shrink-0 text-muted sm:h-3.5 sm:w-3.5" aria-hidden />
         <select
           id="reporting-week"
           value={selected}
           onChange={(e) => update({ week: e.target.value })}
-          className="bg-transparent text-[12px] font-semibold text-ink outline-none"
+          className="min-h-9 w-full bg-transparent text-[13px] font-semibold text-ink outline-none sm:min-h-0 sm:w-auto sm:text-[12px]"
         >
           {weeks.map((w) => (
             <option key={w} value={w}>
@@ -76,13 +78,13 @@ export function ReportingControls({
           ]}
         />
       ) : (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-deep px-2.5 py-1 text-[11px] font-bold text-white">
+        <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-accent-deep px-3 py-1 text-[11.5px] font-bold text-white sm:min-h-0 sm:px-2.5 sm:text-[11px]">
           <Upload className="h-3 w-3" aria-hidden /> Published
         </span>
       )}
 
       {dataState === "NO_DATA" ? (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-panel2 px-2.5 py-1 text-[11px] font-semibold text-muted">
+        <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line bg-panel2 px-3 py-1 text-[11.5px] font-semibold text-muted sm:min-h-0 sm:px-2.5 sm:text-[11px]">
           <Info className="h-3 w-3" aria-hidden /> No data this week
         </span>
       ) : null}

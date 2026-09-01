@@ -1,85 +1,71 @@
-# Local development infrastructure.
-# Standard flow: run Postgres + MinIO in Docker, run Next.js on the host:
-#   docker compose up -d postgres minio createbucket
-#   pnpm db:migrate && pnpm db:seed:demo && pnpm dev
-# To run the app containerized too: docker compose --profile app up -d
+# Zameen Admin Properties — Operations & Command Center
 #
-# No Docker on your machine? `pnpm db:dev` boots an embedded PostgreSQL 18
-# and STORAGE_DRIVER=local stores media on disk (development only).
+# Full stack, one command:
+#   cp .env.example .env      # then set BETTER_AUTH_SECRET (see README)
+#   docker compose up -d --build
+#   docker compose exec app pnpm db:migrate
+#   docker compose exec app pnpm bootstrap:admin
+#
+# Media (checklist evidence + progress photographs) is stored on the `media`
+# volume, NOT in an object store. The volume must be backed up alongside the
+# database — see docs/backup-and-restore.md.
+#
+# Postgres only listens on the compose network; nothing but the app reaches it.
+
+name: zameen-admin
 
 services:
   postgres:
-    image: postgres:18
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: zameen
-      POSTGRES_PASSWORD: zameen
-      POSTGRES_DB: zameen_admin
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-zameen}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
+      POSTGRES_DB: ${POSTGRES_DB:-zameen_admin}
+      # Urdu/Arabic names in the PropOne data require a UTF-8 database.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zameen -d zameen_admin"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zameen} -d ${POSTGRES_DB:-zameen_admin}"]
       interval: 5s
-      timeout: 3s
-      retries: 10
-
-  minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: zameen-minio
-      MINIO_ROOT_PASSWORD: zameen-minio-secret
+      timeout: 5s
+      retries: 20
+    # Published on localhost only, for psql/pg_dump from the host.
     ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # web console
-    volumes:
-      - miniodata:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  # One-shot: creates the private media bucket.
-  createbucket:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 zameen-minio zameen-minio-secret &&
-      mc mb --ignore-existing local/zameen-admin-media &&
-      echo 'bucket ready'
-      "
+      - "127.0.0.1:5432:5432"
 
   app:
-    profiles: ["app"]
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_healthy
     environment:
-      APP_URL: http://localhost:3000
-      DATABASE_URL: postgres://zameen:zameen@postgres:5432/zameen_admin
-      BETTER_AUTH_SECRET: local-compose-secret-change-me
-      BETTER_AUTH_URL: http://localhost:3000
-      STORAGE_DRIVER: s3
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: us-east-1
-      S3_BUCKET: zameen-admin-media
-      S3_ACCESS_KEY_ID: zameen-minio
-      S3_SECRET_ACCESS_KEY: zameen-minio-secret
-      S3_FORCE_PATH_STYLE: "true"
+      NODE_ENV: production
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
+      DATABASE_URL: postgres://${POSTGRES_USER:-zameen}:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/${POSTGRES_DB:-zameen_admin}
+      # Absolute path onto the mounted volume — required in production.
+      STORAGE_MEDIA_PATH: /var/lib/zameen/media
+      PROPONE_MODE: ${PROPONE_MODE:-file}
+      PROPONE_REDSHIFT_URL: ${PROPONE_REDSHIFT_URL:-}
+      PROPONE_REDSHIFT_SCHEMA: ${PROPONE_REDSHIFT_SCHEMA:-}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-}
+    volumes:
+      - media:/var/lib/zameen/media
     ports:
-      - "3000:3000"
+      - "${APP_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
 volumes:
   pgdata:
-  miniodata:
+  media:

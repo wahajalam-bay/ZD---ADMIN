@@ -13,9 +13,13 @@ Reverse proxy / load balancer (nginx / Caddy / Traefik — TLS terminates here)
         ▼
 Next.js app container (this image, port 3000, non-root)
         ├──► PostgreSQL 18 (private network only — never publicly exposed)
-        └──► S3-compatible object storage, PRIVATE bucket
-             (AWS S3 / Cloudflare R2 / self-hosted MinIO)
+        └──► media volume mounted at /var/lib/zameen/media
+             (a plain disk volume — there is no object store to run)
 ```
+
+Photographs are never served straight off disk: every read goes through
+`/api/media/[...key]`, which authenticates the caller and enforces property
+isolation before returning a byte.
 
 ## 1. Prerequisites
 
@@ -24,7 +28,8 @@ Next.js app container (this image, port 3000, non-root)
 - **HTTPS is required** — auth cookies are `Secure` in production. Configure the
   proxy to forward `Host` and `X-Forwarded-*` headers to the app.
 - PostgreSQL 18 (managed service or container) reachable from the app only.
-- An S3-compatible bucket, **private**, with an access key limited to that bucket.
+- A persistent disk volume for media, mounted into the container. Size it for the
+  photo volume: roughly 1–2 GB per property per year at current upload rates.
 
 ## 2. Environment variables
 
@@ -35,11 +40,9 @@ Copy `.env.example` and set real values (never commit secrets):
 | `APP_URL`, `BETTER_AUTH_URL` | `https://<your-domain>` (both, exactly) |
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` — unique per environment |
 | `DATABASE_URL` | `postgres://user:pass@host:5432/zameen_admin` |
-| `STORAGE_DRIVER` | `s3` (production must not use `local`) |
-| `S3_ENDPOINT` | Provider endpoint (omit for AWS S3) |
-| `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Bucket credentials |
-| `S3_FORCE_PATH_STYLE` | `true` for MinIO/R2, `false` for AWS |
-| `PROPONE_MODE` | `file` until the PropOne API is specified |
+| `STORAGE_MEDIA_PATH` | Absolute path to the mounted volume, e.g. `/var/lib/zameen/media`. The app **refuses to start** in production on a relative path, because that would write photographs inside the container where the next deploy destroys them. |
+| `PROPONE_MODE` | `file` until the PropOne API is specified; `redshift` for the live warehouse sync |
+| `PROPONE_REDSHIFT_URL` | Only when `PROPONE_MODE=redshift`. A real credential — inject it as a secret, never bake it into an image or commit it. |
 
 ## 3. Build & start
 
@@ -116,8 +119,9 @@ restore the pre-upgrade dump (migrations are forward-only).
 
 ## 7. Security notes
 
-- The database and MinIO must not be exposed to the public internet.
-- The media bucket stays private; all reads flow through the app's authenticated
+- The database must not be exposed to the public internet. In the supplied compose
+  file it is bound to `127.0.0.1` for local `pg_dump` only.
+- The media volume is never served by the web server directly; all reads flow through the app's authenticated
   `/api/media` route.
 - Security headers (CSP, nosniff, frame-deny, referrer policy) ship in
   `next.config.ts`; add HSTS at the proxy once HTTPS is stable:
@@ -129,7 +133,7 @@ restore the pre-upgrade dump (migrations are forward-only).
 
 - Production domain name + TLS certificate strategy.
 - Production PostgreSQL credentials/hosting choice.
-- Production object-storage credentials (S3/R2/MinIO).
+- The PropOne Redshift URL, if the live sync is enabled.
 - PropOne API specification or committed weekly export format (until then:
   CSV import at Admin → Integrations).
 - SMTP details only if self-service password reset is wanted later.

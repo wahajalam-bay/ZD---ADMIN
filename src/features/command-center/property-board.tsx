@@ -449,7 +449,7 @@ function LegendButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2 rounded-input px-1.5 py-1 text-start transition-colors hover:bg-panel2",
+        "flex min-h-9 items-center gap-2 rounded-input px-2 py-1.5 text-start transition-colors hover:bg-panel2 sm:min-h-0 sm:px-1.5 sm:py-1",
         className,
       )}
     >

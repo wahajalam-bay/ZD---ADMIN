@@ -117,7 +117,7 @@ export function ChecklistBoard({
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="bg-transparent font-mono text-[12px] text-ink outline-none"
+            className="min-h-9 bg-transparent font-mono text-[16px] text-ink outline-none sm:min-h-0 sm:text-[12px]"
           />
         </div>
         <div className="w-full overflow-x-auto sm:w-auto">

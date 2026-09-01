@@ -199,6 +199,52 @@ body::before {
   background: radial-gradient(circle, rgba(13, 122, 63, 0.14), transparent 70%);
 }
 
+/* ---- Mobile ---------------------------------------------------------- */
+
+/* Notch / home-indicator insets, added as margin so utility padding survives. */
+.safe-area {
+  margin-inline-start: env(safe-area-inset-left);
+  margin-inline-end: env(safe-area-inset-right);
+  margin-block-end: env(safe-area-inset-bottom);
+}
+
+/*
+ * Wide data tables scroll inside their own container rather than pushing the
+ * page sideways. The shadow hints that there is more to the right, and the
+ * momentum scrolling makes it feel native on touch.
+ */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+@media (max-width: 640px) {
+  .table-scroll {
+    background:
+      linear-gradient(to right, var(--surface) 30%, transparent),
+      linear-gradient(to left, var(--surface) 30%, transparent) 100% 0,
+      radial-gradient(farthest-side at 0 50%, rgba(6, 61, 36, 0.14), transparent),
+      radial-gradient(farthest-side at 100% 50%, rgba(6, 61, 36, 0.14), transparent) 100% 0;
+    background-repeat: no-repeat;
+    background-size:
+      36px 100%,
+      36px 100%,
+      12px 100%,
+      12px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+}
+
+/* Pointer-coarse devices get a comfortable minimum on every icon-only control. */
+@media (pointer: coarse) {
+  button,
+  [role="tab"],
+  [role="switch"],
+  select {
+    touch-action: manipulation;
+  }
+}
+
 /* Dark navigation hover (a style-prop colour cannot express :hover) */
 .nav-item:hover {
   background: var(--nav-hover) !important;

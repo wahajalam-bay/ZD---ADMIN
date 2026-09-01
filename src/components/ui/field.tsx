@@ -5,8 +5,13 @@ export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLab
   return <label className={cn("t-label mb-1.5 block text-muted", className)} {...props} />;
 }
 
+/**
+ * 16px text on phones is deliberate: iOS Safari zooms the whole page when a
+ * focused input is smaller than that. The 40px minimum height keeps the field
+ * comfortable to tap; both tighten to the dense desktop scale from `sm` up.
+ */
 const controlBase =
-  "w-full rounded-input border border-line bg-panel px-2.5 py-2 text-[12.5px] text-ink transition-colors placeholder:text-muted/60 hover:border-line-strong disabled:bg-panel2 disabled:text-muted";
+  "min-h-10 w-full rounded-input border border-line bg-panel px-3 py-2 text-[16px] text-ink transition-colors placeholder:text-muted/60 hover:border-line-strong disabled:bg-panel2 disabled:text-muted sm:min-h-0 sm:px-2.5 sm:text-[12.5px]";
 
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...props }, ref) {
