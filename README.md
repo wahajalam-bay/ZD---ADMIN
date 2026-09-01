@@ -122,17 +122,37 @@ pnpm db:seed:legacy        # the legacy Command Center week, merged verbatim
 pnpm dev                   # http://localhost:3000
 ```
 
-### Demo accounts (`pnpm db:seed:demo`, development only)
+## Accounts
 
-All use the password from `SEED_DEMO_PASSWORD` in `.env` (default documented there):
+Provision the standard operating set with generated passwords (printed once,
+stored only as a hash):
 
-| Email | Role |
-| --- | --- |
-| `manager.admin@zameen.local` | Manager / Admin |
-| `assistant.manager@zameen.local` | Assistant Manager |
-| `opal.site@zameen.local` / `aurum.site@zameen.local` / `quadrangle.site@zameen.local` | Site users |
+```bash
+pnpm provision:users --domain zameen.pk     # add --reset to re-issue passwords
+```
 
-Demo records are labeled `DEMO` and must never be seeded in production.
+| Account | Role | Scope |
+| --- | --- | --- |
+| `manager.admin@…` | Manager / Admin | All properties · review, approve, publish · users, properties, integrations, audit |
+| `opal.site@…` | Site user | Opal only, server-enforced |
+| `aurum.site@…` | Site user | Aurum only, server-enforced |
+| `quadrangle.site@…` | Site user | Quadrangle only, server-enforced |
+
+Add `--with-assistant` to also create an Assistant Manager, when review duties are
+split from administration.
+
+Inside a running container:
+
+```bash
+docker compose exec app sh -c 'cd /tools && node_modules/.bin/tsx scripts/provision-users.ts --domain your-domain.com'
+```
+
+`pnpm bootstrap:admin` creates a single Manager/Admin with a password you choose
+(`ADMIN_EMAIL`, `ADMIN_PASSWORD`) if you would rather start with just one account.
+
+`pnpm db:seed:demo` additionally creates clearly-labelled DEMO accounts and records
+for development. **Never seed demo data on a real deployment**, and delete any demo
+accounts before go-live at Admin → Users.
 
 ## Commands
 
@@ -145,6 +165,7 @@ Demo records are labeled `DEMO` and must never be seeded in production.
 | `pnpm db:seed:legacy` | Merge the legacy Command Center week (verbatim tasks, issues, summaries) |
 | `pnpm db:studio` | Drizzle Studio |
 | `pnpm bootstrap:admin` | Create the first production Manager/Admin |
+| `pnpm provision:users` | Create the standard role set with generated passwords |
 | `pnpm lint` / `pnpm typecheck` | ESLint / strict TypeScript |
 | `pnpm test` | Vitest unit suite (weeks, compliance, metrics, RBAC, validators, PropOne) |
 | `pnpm test:e2e` | Playwright (isolation, escalation, full workflow, exact photo linkage, admin) — needs a seeded demo DB |

@@ -24,6 +24,7 @@
     "db:studio": "drizzle-kit studio",
     "db:dev": "tsx scripts/dev-db.ts",
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
+    "provision:users": "tsx scripts/provision-users.ts",
     "import:reference-photos": "tsx scripts/import-reference-photos.ts",
     "remove:demo-photos": "tsx scripts/remove-demo-photos.ts"
   },
