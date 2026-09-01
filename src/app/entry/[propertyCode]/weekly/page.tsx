@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getPropertyByCode } from "@/server/permissions";
-import { getSessionUser } from "@/server/auth/session";
+import { requirePageUser } from "@/server/auth/session";
 import { getWeeklyReportView } from "@/server/services/weekly-report-service";
 import { canEditSubmission } from "@/lib/roles";
 import { currentWeekStart, isIsoDate, weekStartOf } from "@/lib/week";
@@ -20,7 +20,7 @@ export default async function WeeklyReportPage({
   const sp = await searchParams;
   const property = await getPropertyByCode(propertyCode);
   if (!property) notFound();
-  const user = (await getSessionUser())!;
+  const user = await requirePageUser();
 
   const weekStart = sp.week && isIsoDate(sp.week) ? weekStartOf(sp.week) : currentWeekStart();
   const { report, tasks, media } = await getWeeklyReportView(property.id, weekStart);

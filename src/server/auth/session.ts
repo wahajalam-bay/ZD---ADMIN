@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { auth } from "@/server/auth/auth";
 import { isRole, type Role } from "@/lib/roles";
 
@@ -36,3 +37,14 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
     banned: Boolean(u.banned),
   };
 });
+
+/**
+ * Page-level session requirement. Layout guards do not stop a page component
+ * from rendering (Next renders them concurrently), so every page that needs a
+ * user must resolve it null-safely — a stale cookie yields null here.
+ */
+export async function requirePageUser(): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  return user;
+}

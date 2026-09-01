@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPropertyByCode } from "@/server/permissions";
-import { getSessionUser } from "@/server/auth/session";
+import { requirePageUser } from "@/server/auth/session";
 import { getEntryView } from "@/server/services/checklist-service";
 import { canEditSubmission } from "@/lib/roles";
 import { isIsoDate, todayStr } from "@/lib/week";
@@ -21,7 +21,7 @@ export default async function ChecklistEntryPage({
   const sp = await searchParams;
   const property = await getPropertyByCode(propertyCode);
   if (!property) notFound();
-  const user = (await getSessionUser())!;
+  const user = await requirePageUser();
 
   const date = sp.date && isIsoDate(sp.date) ? sp.date : todayStr();
   const view = await getEntryView(property.id, categoryKey, date);

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSessionUser } from "@/server/auth/session";
+import { requirePageUser } from "@/server/auth/session";
 import { canReview } from "@/lib/roles";
 import {
   portfolioMetrics,
@@ -28,7 +28,7 @@ export default async function PortfolioOverviewPage({
   searchParams: Promise<{ week?: string; preview?: string }>;
 }) {
   const params = await searchParams;
-  const user = (await getSessionUser())!;
+  const user = await requirePageUser();
   const previewAllowed = canReview(user.role);
   const previewOn = previewAllowed && params.preview === "1";
   const statuses = previewOn ? PREVIEW : PUBLISHED_ONLY;

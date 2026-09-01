@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { getSessionUser } from "@/server/auth/session";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Sign in" };
+export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  // Authoritative session check (a mere cookie is not enough — it may be stale).
+  const user = await getSessionUser();
+  if (user) redirect("/");
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">

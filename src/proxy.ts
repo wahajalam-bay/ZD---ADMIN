@@ -11,10 +11,10 @@ export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionCookie = getSessionCookie(request);
 
+  // /login is always reachable: the cookie may be stale (e.g. session rows
+  // gone) and only the server can tell — the login page itself redirects
+  // genuinely authenticated users away after a real session check.
   if (pathname === "/login") {
-    if (sessionCookie) {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
     return NextResponse.next();
   }
 

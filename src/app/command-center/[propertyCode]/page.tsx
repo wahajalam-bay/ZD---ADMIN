@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getSessionUser } from "@/server/auth/session";
+import { requirePageUser } from "@/server/auth/session";
 import { getPropertyByCode } from "@/server/permissions";
 import { canReview } from "@/lib/roles";
 import {
@@ -16,7 +16,11 @@ import {
   resolveSelectedWeek,
   weekDataState,
 } from "@/server/services/reporting-week-service";
-import { propOneWidgetsForProperty } from "@/server/services/propone-service";
+import {
+  propOneTrendsForProperty,
+  propOneWidgetsForProperty,
+} from "@/server/services/propone-service";
+import { PropOneTrendsSection } from "@/features/command-center/propone-trends";
 import { weeklyPhotosForWeek } from "@/server/services/media-service";
 import { buildPropOneWidgetViews } from "@/features/command-center/propone-mapper";
 import { PropOneWidgets } from "@/features/command-center/propone-widgets";
@@ -55,13 +59,13 @@ export default async function PropertyDashboardPage({
   const property = await getPropertyByCode(propertyCode);
   if (!property || !property.active) notFound();
 
-  const user = (await getSessionUser())!;
+  const user = await requirePageUser();
   const previewAllowed = canReview(user.role);
   const previewOn = previewAllowed && sp.preview === "1";
   const statuses = previewOn ? PREVIEW : PUBLISHED_ONLY;
 
   const week = await resolveSelectedWeek(sp.week);
-  const [weeks, state, statsMap, complianceMap, tasks, bottlenecks, widgets, photos] =
+  const [weeks, state, statsMap, complianceMap, tasks, bottlenecks, widgets, photos, trends] =
     await Promise.all([
       listKnownWeeks(),
       weekDataState(week, property.id),
@@ -71,6 +75,7 @@ export default async function PropertyDashboardPage({
       bottlenecksForProperty(property.id, week, statuses),
       propOneWidgetsForProperty(property.id, week),
       weeklyPhotosForWeek(week, statuses, property.id),
+      propOneTrendsForProperty(property.id),
     ]);
 
   const stats = statsMap.get(property.id) ?? null;
@@ -138,6 +143,11 @@ export default async function PropertyDashboardPage({
         <div className="line" />
       </div>
       <PropOneWidgets widgets={widgetViews} />
+      <PropOneTrendsSection
+        visitsWeekly={trends.visitsWeekly}
+        bookingsWeekly={trends.bookingsWeekly}
+        workOrdersMonthly={trends.workOrdersMonthly}
+      />
 
       <div className="secbar">
         <h3>Status Overview</h3>

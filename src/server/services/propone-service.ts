@@ -24,7 +24,7 @@ import {
   type VisitMetrics,
   type WorkOrderMetrics,
 } from "@/lib/propone-metrics";
-import { todayStr, weekEndOf } from "@/lib/week";
+import { addDays, todayStr, weekEndOf, weekStartOf } from "@/lib/week";
 import { PropOneApiAdapter } from "@/server/integrations/propone/api-adapter";
 import { PropOneFileImportAdapter } from "@/server/integrations/propone/file-import-adapter";
 import { PropOneRedshiftAdapter } from "@/server/integrations/propone/redshift-adapter";
@@ -168,6 +168,100 @@ export async function propOneWidgetsForProperty(
     }
   }
   return widgets;
+}
+
+export interface PropOneTrends {
+  /** Visits per week (Monday key), oldest → newest, gaps zero-filled. */
+  visitsWeekly: Array<{ week: string; count: number }>;
+  /** Amenity bookings per week (Monday key), oldest → newest, zero-filled. */
+  bookingsWeekly: Array<{ week: string; count: number }>;
+  /** Work orders created per month with per-status split, oldest → newest. */
+  workOrdersMonthly: Array<{ month: string; byStatus: Record<string, number>; total: number }>;
+}
+
+/**
+ * Time-series analytics from the synced PropOne records (trend lines for the
+ * property dashboards). Aggregation happens in SQL; missing periods are
+ * zero-filled so lines do not jump over quiet weeks.
+ */
+export async function propOneTrendsForProperty(
+  propertyId: string,
+  opts: { weeks?: number; months?: number } = {},
+): Promise<PropOneTrends> {
+  const weeks = opts.weeks ?? 12;
+  const months = opts.months ?? 6;
+
+  const zeroFillWeeks = (rows: Array<{ week: string; count: number }>) => {
+    const byWeek = new Map(rows.map((r) => [r.week, r.count]));
+    const out: Array<{ week: string; count: number }> = [];
+    let cursor = addDays(weekStartOf(todayStr()), -7 * (weeks - 1));
+    for (let i = 0; i < weeks; i++) {
+      out.push({ week: cursor, count: byWeek.get(cursor) ?? 0 });
+      cursor = addDays(cursor, 7);
+    }
+    return out;
+  };
+
+  const visitRows = await db
+    .select({
+      week: sql<string>`to_char(date_trunc('week', ${propOneVisits.arrivalAt}), 'YYYY-MM-DD')`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(propOneVisits)
+    .where(
+      and(
+        eq(propOneVisits.propertyId, propertyId),
+        sql`${propOneVisits.arrivalAt} >= now() - make_interval(weeks => ${weeks})`,
+      ),
+    )
+    .groupBy(sql`1`);
+
+  const bookingRows = await db
+    .select({
+      week: sql<string>`to_char(date_trunc('week', ${propOneBookings.bookingAt}), 'YYYY-MM-DD')`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(propOneBookings)
+    .where(
+      and(
+        eq(propOneBookings.propertyId, propertyId),
+        sql`${propOneBookings.bookingAt} >= now() - make_interval(weeks => ${weeks})`,
+      ),
+    )
+    .groupBy(sql`1`);
+
+  const woRows = await db
+    .select({
+      month: sql<string>`to_char(date_trunc('month', ${propOneWorkOrders.orderDate}::date), 'YYYY-MM')`,
+      status: propOneWorkOrders.status,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(propOneWorkOrders)
+    .where(
+      and(
+        eq(propOneWorkOrders.propertyId, propertyId),
+        sql`${propOneWorkOrders.orderDate} is not null`,
+        sql`${propOneWorkOrders.orderDate}::date >= date_trunc('month', now()) - make_interval(months => ${months - 1})`,
+      ),
+    )
+    .groupBy(sql`1`, propOneWorkOrders.status);
+
+  const monthsMap = new Map<string, { byStatus: Record<string, number>; total: number }>();
+  for (const r of woRows) {
+    const m = monthsMap.get(r.month) ?? { byStatus: {}, total: 0 };
+    m.byStatus[r.status] = (m.byStatus[r.status] ?? 0) + r.count;
+    m.total += r.count;
+    monthsMap.set(r.month, m);
+  }
+  const workOrdersMonthly = [...monthsMap.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([month, v]) => ({ month, ...v }));
+
+  return {
+    visitsWeekly: zeroFillWeeks(visitRows),
+    bookingsWeekly: zeroFillWeeks(bookingRows),
+    workOrdersMonthly,
+  };
 }
 
 /** Admin integrations page status block. */
