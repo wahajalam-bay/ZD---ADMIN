@@ -110,7 +110,30 @@ mail provider.
 Modeled but honest: `weekly_media.mediaType` supports `VIDEO` (no fake data seeded);
 Live Camera renders a configuration-pending empty state. No feeds are fabricated.
 
-## 10. Review-time editing
+## 10. Legacy reference photos — imported
+
+The 146 real site photos embedded as base64 in the reference Command Center were
+migrated with `pnpm import:reference-photos [--publish]`: each image runs through
+the production upload pipeline (sharp validation/re-encode/thumbnail) into object
+storage and attaches as weekly progress media on the property's current-week report
+with its original caption; reference hero photos become the property hero images.
+Idempotent (dedupe by original filename per property). Base64 never enters the
+database.
+
+## 11. Redshift (PropOne Pakistan) — connection boundary ready, schema pending
+
+A Redshift adapter exists (`src/server/integrations/propone/redshift-adapter.ts`);
+Redshift speaks the PostgreSQL wire protocol so the standard `pg` driver connects
+directly via `PROPONE_REDSHIFT_URL` (+ optional `PROPONE_REDSHIFT_SCHEMA`), with a
+"Test Redshift connection" probe on Admin → Integrations and `PROPONE_MODE=redshift`
+support. **Still required from the data team:** cluster endpoint + read-only
+credentials, network reachability (VPN/IP allowlist) from the app host, and the
+PropOne Pakistan table/column layout including how rows map to properties — the
+warehouse schema is not invented here. Once supplied, only `fetchRecords` in the
+adapter needs implementing; normalized storage, dedupe/provenance, widgets and
+dashboards are already wired.
+
+## 12. Review-time editing
 
 AM/Manager "edit submissions" is implemented by opening the same entry form with
 role-based edit rights (`canEditSubmission`): AM edits anything unpublished,

@@ -6,6 +6,7 @@ import { PROPONE_DOMAINS, PROPONE_DOMAIN_LABELS } from "@/lib/propone-metrics";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PropOneImport } from "@/features/admin/propone-import";
+import { RedshiftStatus } from "@/features/admin/redshift-status";
 import { WidgetConfigMatrix } from "@/features/admin/widget-config-matrix";
 import { formatDateTime } from "@/lib/utils";
 
@@ -39,13 +40,16 @@ export default async function AdminIntegrationsPage() {
         <Card className="p-5">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-[13px] font-bold tracking-wide uppercase">Source mode</h3>
-            <Badge className="bg-ink text-white">{status.mode === "api" ? "API" : "File import"}</Badge>
+            <Badge className="bg-ink text-white">
+              {status.mode === "api" ? "API" : status.mode === "redshift" ? "Redshift" : "File import"}
+            </Badge>
           </div>
           <p className="text-[13px] leading-relaxed text-muted">{status.active.detail}</p>
           <div className="mt-3 border-t border-line pt-3">
             <div className="text-[11px] font-bold tracking-wide text-muted uppercase">API readiness</div>
             <p className="mt-1 text-[13px] leading-relaxed text-muted">{status.api.detail}</p>
           </div>
+          <RedshiftStatus detail={status.redshift.detail} configured={status.redshiftConfigured} />
         </Card>
         <Card className="p-5">
           <h3 className="mb-2 text-[13px] font-bold tracking-wide uppercase">Last successful sync</h3>

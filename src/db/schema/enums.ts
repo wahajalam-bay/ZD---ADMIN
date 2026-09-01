@@ -39,7 +39,7 @@ export const propOneDomainEnum = pgEnum("propone_domain", [
   "ANNOUNCEMENTS",
 ]);
 
-export const syncModeEnum = pgEnum("sync_mode", ["API", "FILE_IMPORT"]);
+export const syncModeEnum = pgEnum("sync_mode", ["API", "FILE_IMPORT", "REDSHIFT"]);
 
 export const syncStatusEnum = pgEnum("sync_status", [
   "RUNNING",

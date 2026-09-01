@@ -15,6 +15,13 @@
       "when": 1788258029443,
       "tag": "0001_nostalgic_mimic",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788262023809,
+      "tag": "0002_unknown_hemingway",
+      "breakpoints": true
     }
   ]
 }

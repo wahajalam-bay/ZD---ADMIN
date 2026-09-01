@@ -67,9 +67,9 @@ export interface FetchOptions {
   since?: Date;
 }
 
-/** Contract every PropOne source (API or file) must satisfy. */
+/** Contract every PropOne source (API, Redshift warehouse, or file) must satisfy. */
 export interface PropOneAdapter {
-  readonly mode: "API" | "FILE_IMPORT";
+  readonly mode: "API" | "FILE_IMPORT" | "REDSHIFT";
   /** Human-readable readiness state for the admin integrations page. */
   describe(): { ready: boolean; detail: string };
   fetchRecords?(domain: PropOneDomain, opts: FetchOptions): Promise<NormalizedRecord[]>;

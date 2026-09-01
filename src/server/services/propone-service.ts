@@ -27,9 +27,12 @@ import {
 import { todayStr, weekEndOf } from "@/lib/week";
 import { PropOneApiAdapter } from "@/server/integrations/propone/api-adapter";
 import { PropOneFileImportAdapter } from "@/server/integrations/propone/file-import-adapter";
+import { PropOneRedshiftAdapter } from "@/server/integrations/propone/redshift-adapter";
 
 export function getActiveAdapter() {
-  return env.PROPONE_MODE === "api" ? new PropOneApiAdapter() : new PropOneFileImportAdapter();
+  if (env.PROPONE_MODE === "api") return new PropOneApiAdapter();
+  if (env.PROPONE_MODE === "redshift") return new PropOneRedshiftAdapter();
+  return new PropOneFileImportAdapter();
 }
 
 export interface PropOneWidgetData {
@@ -169,6 +172,7 @@ export async function propOneWidgetsForProperty(
 export async function integrationStatus() {
   const adapter = getActiveAdapter();
   const apiAdapter = new PropOneApiAdapter();
+  const redshiftAdapter = new PropOneRedshiftAdapter();
   const recentRuns = await db
     .select({
       run: propOneSyncRuns,
@@ -190,6 +194,8 @@ export async function integrationStatus() {
     mode: env.PROPONE_MODE,
     active: adapter.describe(),
     api: apiAdapter.describe(),
+    redshift: redshiftAdapter.describe(),
+    redshiftConfigured: Boolean(env.PROPONE_REDSHIFT_URL),
     lastSuccess: lastSuccess ?? null,
     recentRuns,
   };

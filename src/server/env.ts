@@ -22,9 +22,12 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v === "true"),
   SEED_DEMO_PASSWORD: z.string().optional(),
-  PROPONE_MODE: z.enum(["file", "api"]).default("file"),
+  PROPONE_MODE: z.enum(["file", "api", "redshift"]).default("file"),
   PROPONE_API_BASE_URL: z.string().optional(),
   PROPONE_API_TOKEN: z.string().optional(),
+  /** Redshift (PropOne Pakistan warehouse) — postgres-wire connection URL. */
+  PROPONE_REDSHIFT_URL: z.string().optional(),
+  PROPONE_REDSHIFT_SCHEMA: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
